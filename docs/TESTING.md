@@ -17,6 +17,8 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Studio presets build lights aimed at the puppet; picking another preset replaces them; your own lights switch off and come back with "Use My Own Lights". HDRI presets use Blender's own HDRIs, packed into the file.
 - Solid world: moves stop at surfaces and slide along them, continue past edges (hand slides off the table and on down to the floor), can always back out of something they started inside; a body drag with pinned feet stops when a hand lands on the table; a pinned foot slides along the floor and bumps the table leg.
 - Props drop onto whatever is under them (mug onto the table top, ball onto the floor); holding a prop doesn't make it jump, it then follows the hand; letting go leaves it in place.
+- Sculpt a shot: a shape key per shot, on only for that shot (or carry on from it); it follows its shot through deletes and survives a pose over; Save as Swap Part renames it into a swap set (Face › Surprised).
+- Nomad bridge: Send writes an OBJ (Y-up, exact round trip); the folder watcher spots the re-exported file and puts the sculpt on that shot; same vertex count is matched point for point, a reordered or triangulated mesh is fitted to the surface.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -57,13 +59,22 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 29. Shoot with the mug held, let go, shoot again, step back: each shot remembers whether it was held.
 30. Turn Solid world off: rings drag freely again (Blender's normal move).
 
+## Sculpt a shot & Nomad (0.5.0)
+31. Shoot a few shots, step onto one. Stop Motion › Sculpt a Shot › Sculpt here: Blender goes into sculpt mode on Bramble's body. Sculpt something big (puff the cheeks). Done Sculpting.
+32. Step through: only that shot is sculpted. "Carry on" on its row: it stays from that shot on. "Just this" puts it back to one shot.
+33. Pose over the sculpted shot: the sculpt stays.
+34. Save as Swap Part (the + icon): name it Face › Surprised. It appears in the Puppet panel's swaps, usable on any shot.
+35. Nomad: Send to Nomad. Show Nomad Folder opens iCloud Drive › Stop Motion Nomad (or the folder you set). On the iPad, in Nomad: Files › Import, turn on **Keep topology** in the advanced options, open the .obj, sculpt (no remesh / dynamic topology), then Files › Export › OBJ, saving over the same file name in the same folder.
+36. Within a couple of seconds of iCloud syncing, the row says "Back from Nomad (same points)" and the shot shows the sculpt. If it says "fitted to surface", the vertices changed in Nomad: the result is close, not exact. Bring Back Now forces it.
+
 ## Known gaps
 - Shot cards are a grid in the sidebar, not yet the strip from the mockup.
 - Switching the filming camera isn't part of the shots yet (it's for checking angles).
 - The ghost comes from whichever camera took each shot, so it lines up only on that camera.
 - Twisting (Alt+drag, and joined parts like the head) isn't stopped by solids yet; only moves are.
 - A puppet's own parts can pass through each other (hand into own body).
-- No sculpt yet (step 5).
+- Sculpting is on the mesh at rest (the shape is added on top of the pose), so very big posed changes are easier in Blender than in Nomad.
+- Nomad remesh, Dynamic Topology or Multires change the mesh: the sculpt is then fitted to the surface (close, not exact).
 - Rigs that already have IK foot controls (e.g. Rigify) get rings on those controls and no extra pins.
 - Pins can flip a knee the wrong way on extreme poses (no knee direction target yet).
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.

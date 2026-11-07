@@ -300,8 +300,9 @@ def write_value(struct, prop, frames, value):
     for fc in fcs:
         v = vals[fc.array_index] if fc.array_index < len(vals) else vals[-1]
         for f in frames:
-            kp = fc.keyframe_points.insert(f, v, options={'REPLACE', 'FAST'})
-            kp.interpolation = 'CONSTANT'
+            kp = fc.keyframe_points.insert(f, v, options={'FAST'})  # adds, or replaces a key on that frame
+            if kp is not None:
+                kp.interpolation = 'CONSTANT'
         fc.update()
 
 

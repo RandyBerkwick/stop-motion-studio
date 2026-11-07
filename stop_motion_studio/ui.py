@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+import os
+
 import blf
 import bpy
 from bpy.app.handlers import persistent
 
-from . import cameras, core, lighting, puppet, solid
+from . import cameras, core, lighting, puppet, sculpt, solid
 
 CATEGORY = "Stop Motion"
 
@@ -278,12 +280,69 @@ class SM_PT_lighting(bpy.types.Panel):
             op.count = wm.stop_motion_effect_count
 
 
+class SM_PT_sculpt(bpy.types.Panel):
+    bl_label = "Sculpt a Shot"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 5
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene = context.scene
+        layout = self.layout
+        if scene.stop_motion_sculpting and context.mode == 'SCULPT':
+            obj, uid = scene.stop_motion_sculpting.split("|", 1)
+            layout.label(text="Sculpting: only this shot changes", icon='SCULPTMODE_HLT')
+            layout.operator("stop_motion.done_sculpting", icon='CHECKMARK')
+            return
+        idx = core.shot_index_at(scene, scene.frame_current)
+        ob = sculpt._target_mesh(context)
+        if idx < 0:
+            layout.label(text="Step onto a shot to sculpt it", icon='INFO')
+        else:
+            layout.label(text="Shot %d · %s" % (idx + 1, ob.name if ob else "select a mesh"))
+            row = layout.row(align=True)
+            row.enabled = ob is not None
+            row.operator("stop_motion.sculpt_shot", text="Sculpt here", icon='SCULPTMODE_HLT')
+            row.operator("stop_motion.send_nomad", text="Send to Nomad", icon='EXPORT')
+        if ob is not None:
+            done = sculpt.shots_with_sculpt(scene, ob)
+            if done:
+                box = layout.box()
+                box.label(text="Sculpted shots on " + ob.name)
+                order = {s.uid: i for i, s in enumerate(scene.stop_motion.shots)}
+                for uid in sorted(done, key=lambda u: order.get(u, 1e9)):
+                    row = box.row(align=True)
+                    n = order.get(uid)
+                    row.operator("stop_motion.goto_shot", text="Shot %s" % (n + 1 if n is not None else "?"),
+                                 icon='SCULPTMODE_HLT').index = n if n is not None else 0
+                    for key, label in (('ONE_OFF', "Just this"), ('CARRY_ON', "Carry on")):
+                        op = row.operator("stop_motion.sculpt_keep", text=label)
+                        op.obj, op.uid, op.keep = ob.name, uid, key
+                    op = row.operator("stop_motion.sculpt_to_swap", text="", icon='FILE_NEW')
+                    op.obj, op.uid = ob.name, uid
+                    op = row.operator("stop_motion.remove_sculpt", text="", icon='X')
+                    op.obj, op.uid = ob.name, uid
+        sends = scene.stop_motion_nomad
+        layout.separator()
+        layout.label(text="Nomad Sculpt bridge")
+        layout.prop(scene, "stop_motion_nomad_dir", text="")
+        layout.operator("stop_motion.open_bridge", icon='FILEBROWSER')
+        for i, item in enumerate(sends):
+            row = layout.row(align=True)
+            row.label(text="%s: %s" % (os.path.basename(item.path), item.status),
+                      icon='TIME' if item.status.startswith("Waiting") else 'CHECKMARK')
+            row.operator("stop_motion.nomad_back", text="", icon='IMPORT').index = i
+            row.operator("stop_motion.nomad_forget", text="", icon='X').index = i
+
+
 class SM_PT_shots(bpy.types.Panel):
     bl_label = "Shots"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 5
+    bl_order = 6
 
     def draw(self, context):
         scene = context.scene
@@ -313,7 +372,7 @@ class SM_PT_review(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 6
+    bl_order = 7
 
     def draw(self, context):
         sm = context.scene.stop_motion
@@ -335,7 +394,7 @@ class SM_PT_view(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 7
+    bl_order = 8
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -419,7 +478,7 @@ def _register_keys():
         _keymaps.append((km, kmi))
 
 
-classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_props, SM_PT_cameras, SM_PT_lighting,
+classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_props, SM_PT_cameras, SM_PT_lighting, SM_PT_sculpt,
            SM_PT_shots, SM_PT_review, SM_PT_view)
 
 

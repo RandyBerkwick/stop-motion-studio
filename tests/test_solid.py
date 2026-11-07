@@ -41,7 +41,7 @@ with bpy.context.temp_override(scene=scene, view_layer=vl):
         me = bpy.data.meshes.new(name); b2 = bmesh.new(); bmesh.ops.create_cube(b2, size=size); b2.to_mesh(me); b2.free()
         o = bpy.data.objects.new(name, me); scene.collection.objects.link(o); o.location = loc; o.stop_motion_prop = True
         return o
-    mug = cube("Mug", (1.0, 0.2, 1.6))
+    mug = cube("Cup", (1.35, 0.35, 1.6))   # clear of the scene's own Mug
     ball = cube("Ball", (-1.6, -0.5, 1.2))
     vl.update()
     d1 = solid.drop_to_surface(ctx, mug); vl.update()
