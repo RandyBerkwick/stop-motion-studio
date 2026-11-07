@@ -35,10 +35,9 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 3. Cameras & light: camera setups + locks, saved views, presets, light per shot. **0.3.0 hand-tested OK on Mac; merged.**
 4. Solid world: collision-aware drag tool, drop to surface. **0.4.0 hand-tested OK on Mac; merged.**
 5. Sculpt: per-shot sculpt, Nomad bridge. **0.5.0 built; logic and file round trip tested headless.**
-
 6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 built on branch studio-ui; interface rendered and checked off-screen; needs a real-window test.**
 
-## Keys
+## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
 
 ## Known add-on limits (fork-only if they ever matter)
