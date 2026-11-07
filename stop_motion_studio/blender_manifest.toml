@@ -1,0 +1,17 @@
+schema_version = "1.0.0"
+
+id = "stop_motion_studio"
+version = "0.1.0"
+name = "Stop Motion Studio"
+tagline = "Move and shoot stop-motion animation, no in-betweens"
+maintainer = "Gregory"
+type = "add-on"
+
+tags = ["Animation", "Camera", "User Interface"]
+
+blender_version_min = "4.4.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+files = "Saves a picture of each shot next to your .blend file for the ghost and quick export"

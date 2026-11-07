@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+dist/
+.DS_Store
+*.blend1
+stopmotion_shots/
+films/
