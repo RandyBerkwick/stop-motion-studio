@@ -60,7 +60,7 @@ sets = {(s.name, s.kind): [i.label for i in s.items] for s in pp.swap_sets}
 print("swaps:", sets)
 assert sets == {("Mouth", 'SHAPE'): ["Grin", "O"], ("Eyes", 'SHAPE'): ["Open", "Shut"], ("Hand", 'MESH'): ["Fist", "Open"]}, sets
 hand_set = next(s for s in pp.swap_sets if s.kind == 'MESH')
-assert puppet.swap_active(hand_set) == 0 and bpy.data.objects["Hand_Open"].hide_viewport
+assert puppet.swap_active(hand_set) == 1 and bpy.data.objects["Hand_Fist"].hide_viewport  # starts on "Open"
 
 def foot_world(side):
     ctx.view_layer.update()

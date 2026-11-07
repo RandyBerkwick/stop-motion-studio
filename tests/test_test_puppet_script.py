@@ -25,9 +25,11 @@ for s in pp.swap_sets:
     if s.kind == 'MESH':
         assert sum(1 for i in s.items if not i.obj.hide_viewport) == 1, s.name
 # hand ring drag stand-in: moving the hand bone moves the swap hand with it
-hand = bpy.data.objects["Hand_Fist"]
-before = hand.matrix_world.translation.copy()
+hand = bpy.data.objects["Hand_Open"]  # the visible swap (hidden ones are not evaluated)
+def hand_pos():
+    vl.update()
+    return hand.evaluated_get(vl.depsgraph).matrix_world.translation.copy()  # not the active scene
+before = hand_pos()
 arm.pose.bones["upper_arm.R"].rotation_quaternion = (0.9, 0.0, 0.43, 0.0)
-vl.update()
-assert (hand.matrix_world.translation - before).length > 0.1
+assert (hand_pos() - before).length > 0.1
 print("TEST PUPPET SCRIPT PASSED")
