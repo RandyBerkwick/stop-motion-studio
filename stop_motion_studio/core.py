@@ -139,6 +139,21 @@ def key_pose(scene, frame, objects):
                 except (TypeError, RuntimeError):
                     pass
             touched.add(key)
+    # Puppets: which swap mesh is showing, and whether each pin is on.
+    from . import puppet as _puppet
+    for arm in _puppet.puppets(scene):
+        for ob in _puppet.swap_objects(arm):
+            for path in ("hide_viewport", "hide_render"):
+                try:
+                    ob.keyframe_insert(path, frame=frame)
+                except (TypeError, RuntimeError):
+                    pass
+            touched.add(ob)
+        for pb in arm.pose.bones:
+            c = pb.constraints.get(_puppet.PIN_CONSTRAINT)
+            if c is not None:
+                c.keyframe_insert("influence", frame=frame)
+                touched.add(arm)
     for idb in touched:
         for fc in fcurves_of(idb):
             for kp in fc.keyframe_points:

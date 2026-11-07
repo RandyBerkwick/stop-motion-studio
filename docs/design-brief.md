@@ -29,14 +29,14 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 - Solid world: parts can't pass through floor, walls or other puppets; props drop onto surfaces; feet pin; hands can hold props.
 
 ## Build order and status
-1. Core: workspace layout, Shoot with holds, shot list, ghost, hide UI, preview/export. **0.1.0 built; shot model tested headless; on-screen parts awaiting hand test.**
-2. Puppet component: rings, swap sets, pin feet.
+1. Core: workspace layout, Shoot with holds, shot list, ghost, hide UI, preview/export. **0.1.0 hand-tested OK on Mac.**
+2. Puppet component: rings, swap sets, pin feet. **0.2.0 built on branch step2-puppet; logic tested headless; rings awaiting hand test.**
 3. Cameras & light: camera setups + locks, saved views, presets, light per shot.
 4. Solid world: collision-aware drag tool, drop to surface.
 5. Sculpt: per-shot sculpt, Nomad bridge.
 
-## Keys (0.1.0)
-Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost.
+## Keys
+Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
 
 ## Known add-on limits (fork-only if they ever matter)
 - Blender's top bar can't be hidden from Python except via Focus mode (Shift+F5).

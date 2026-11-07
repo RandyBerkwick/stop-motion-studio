@@ -3,7 +3,7 @@ import blf
 import bpy
 from bpy.app.handlers import persistent
 
-from . import core
+from . import core, puppet
 
 CATEGORY = "Stop Motion"
 
@@ -76,12 +76,85 @@ class SM_PT_shoot(bpy.types.Panel):
         sub.prop(sm, "ghost_count", text="")
 
 
+def draw_swaps(layout, arm):
+    for si, sset in enumerate(arm.stop_motion_puppet.swap_sets):
+        layout.label(text=sset.name)
+        active = puppet.swap_active(sset)
+        grid = layout.grid_flow(row_major=True, columns=4, even_columns=True, align=True)
+        for ii, it in enumerate(sset.items):
+            op = grid.operator("stop_motion.swap", text=it.label, depress=(ii == active))
+            op.puppet = arm.name
+            op.set_index = si
+            op.item = ii
+
+
+class SM_PT_puppet(bpy.types.Panel):
+    bl_label = "Puppet"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 1
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+        arm = puppet.puppet_for(context)
+        if ob is not None and ob.type == 'ARMATURE' and not ob.stop_motion_puppet.enabled:
+            layout.operator("stop_motion.make_puppet", icon='ARMATURE_DATA')
+        if arm is None:
+            if ob is None or ob.type != 'ARMATURE':
+                layout.label(text="Select a rig, then Make Puppet", icon='INFO')
+            return
+        pp = arm.stop_motion_puppet
+        layout.label(text=arm.name, icon='OUTLINER_OB_ARMATURE')
+
+        pins = [(i, r) for i, r in enumerate(pp.rings) if r.pin is not None]
+        if pins:
+            row = layout.row(align=True)
+            for i, r in pins:
+                on = puppet.is_pinned(arm, r)
+                op = row.operator("stop_motion.toggle_pin", text="Pin " + r.label.lower(),
+                                  icon='PINNED' if on else 'UNPINNED', depress=on)
+                op.puppet = arm.name
+                op.ring = i
+
+        if pp.swap_sets:
+            draw_swaps(layout, arm)
+        else:
+            layout.label(text="No swap parts found", icon='INFO')
+        row = layout.row(align=True)
+        row.operator("stop_motion.rescan_swaps", icon='FILE_REFRESH').puppet = arm.name
+
+        box = layout.box()
+        box.label(text="Grab rings (drag; Alt+drag twists)")
+        for r in pp.rings:
+            row = box.row(align=True)
+            row.prop(r, "label", text="")
+            row.prop(r, "size", text="")
+        layout.operator("stop_motion.unpuppet", icon='X').puppet = arm.name
+
+
+class SM_PT_swap_popup(bpy.types.Panel):
+    bl_label = "Swap"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_ui_units_x = 14
+
+    def draw(self, context):
+        arm = puppet.puppet_for(context)
+        if arm is None or not arm.stop_motion_puppet.swap_sets:
+            self.layout.label(text="No swap parts on this puppet")
+            return
+        self.layout.label(text=arm.name)
+        draw_swaps(self.layout, arm)
+
+
 class SM_PT_shots(bpy.types.Panel):
     bl_label = "Shots"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 1
+    bl_order = 2
 
     def draw(self, context):
         scene = context.scene
@@ -111,7 +184,7 @@ class SM_PT_review(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 2
+    bl_order = 3
 
     def draw(self, context):
         sm = context.scene.stop_motion
@@ -133,7 +206,7 @@ class SM_PT_view(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 3
+    bl_order = 4
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -209,6 +282,7 @@ def _register_keys():
         (dict(type='F5', value='PRESS'), "stop_motion.toggle_ui", {}),
         (dict(type='F5', value='PRESS', shift=True), "stop_motion.focus_camera", {}),
         (dict(type='F6', value='PRESS'), "stop_motion.toggle_ghost", {}),
+        (dict(type='D', value='PRESS'), "wm.call_panel", {"name": "SM_PT_swap_popup", "keep_open": True}),
     ):
         kmi = km.keymap_items.new(op, **args)
         for k, v in props.items():
@@ -216,7 +290,7 @@ def _register_keys():
         _keymaps.append((km, kmi))
 
 
-classes = (SM_UL_shots, SM_PT_shoot, SM_PT_shots, SM_PT_review, SM_PT_view)
+classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_shots, SM_PT_review, SM_PT_view)
 
 
 def register():

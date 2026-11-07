@@ -22,7 +22,7 @@ Run the headless tests with the Blender app:
 ```sh
 scripts/run_tests_mac.sh
 ```
-Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the shot model (shoot, hold, pose over, delete, duplicate, ghost). Shot pictures need a real window, so they're skipped in headless runs.
+Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the shot model (shoot, hold, pose over, delete, duplicate, ghost) and puppets (rings, swaps, pins). Shot pictures need a real window, so they're skipped in headless runs.
 
 ## Layout
 | Path | What |
@@ -32,6 +32,8 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | `stop_motion_studio/layout.py` | Stop Motion workspace (camera + free view), hide UI, camera only |
 | `stop_motion_studio/ui.py` | Sidebar panels, shot grid, camera HUD, hotkeys, frame-change handler |
 | `stop_motion_studio/props.py` | Scene settings and the shot list |
+| `stop_motion_studio/puppet.py` | Make Puppet: ring guessing, swap sets, foot pins |
+| `stop_motion_studio/rings.py` | Grab ring gizmos in the free view and the drag operator |
 
 ## Keys (3D view)
 | Key | Does |
@@ -42,6 +44,7 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | F5 | Hide / show UI |
 | Shift+F5 | Camera only, full window |
 | F6 | Ghost on / off |
+| D | Swap parts pop-up (eyes, mouth, hands) |
 
 ## Licence
 GPL-3.0-or-later (required for Blender add-ons that use its Python API).
