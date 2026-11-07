@@ -24,7 +24,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 4. Puppet setup (rigging component): auto grab rings from the rig (animator never sees bones), swap sets from shape keys or a folder of meshes, "feels real" switches.
 5. Review & export: loop / back-and-forth / last 10 shots, 8/12/24 fps, Movie / Frames / GIF / Blender scene; "as shot" (instant) or final render.
 6. Lighting: studio presets + HDRI presets, light per shot with effect drops (flicker, lightning flash, fade to night, torch sweep, lights out); scope every shot / from here / this shot only.
-7. Sculpt one shot: Blender clay tools or Nomad Sculpt round trip (glb in a synced folder such as iCloud Drive, auto bring-back); keep as one-off, save as swap part, or carry on.
+7. Sculpt one shot: Blender clay tools or Nomad Sculpt round trip (OBJ in a synced folder such as iCloud Drive, auto bring-back); keep as one-off, save as swap part, or carry on.
 - Multiple camera setups, each lockable.
 - Solid world: parts can't pass through floor, walls or other puppets; props drop onto surfaces; feet pin; hands can hold props.
 
@@ -46,7 +46,6 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 ## Decided defaults (can change)
 - Switching camera setups is for checking angles; it isn't recorded in shots (yet).
 - Light changes hold until changed again: lights are keyed with every shot.
-
 - Posing over a sculpted shot keeps its sculpt.
 - Nomad bridge is a file round trip (OBJ in iCloud Drive › Stop Motion Nomad); in Nomad, import with "Keep topology" for an exact match.
 
