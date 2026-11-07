@@ -12,6 +12,9 @@ scripts/build.sh
 ```
 This makes `dist/stop_motion_studio-<version>.zip`. Blender › Preferences › Get Extensions › ▾ › Install from Disk… › pick the zip.
 
+## Test puppet
+`scripts/make_test_puppet.py` builds a new scene, "Puppet Test", with a clay figure (Bramble) whose rig, swap parts (eyes, mouth, right hand) and shape-key brows are named the way Make Puppet expects, plus a floor, table, camera and lights. In Blender: Scripting tab › Open › `scripts/make_test_puppet.py` › Run Script. Your current scene is left alone.
+
 ## Develop on a Mac
 ```sh
 scripts/link_dev_mac.sh

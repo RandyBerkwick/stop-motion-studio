@@ -326,10 +326,18 @@ def rescan_swaps(context, arm):
                 it.shape_key = ref
             else:
                 it.obj = ref
+        if kind == 'SHAPE':
+            kbs = mesh.data.shape_keys.key_blocks
+            if sum(1 for it in s.items if kbs[it.shape_key].value > 0.5) > 1:
+                for it in s.items:  # several parts fully on: start neutral
+                    kbs[it.shape_key].value = 0.0
         if kind == 'MESH':
             showing = [it for it in s.items if it.obj and not it.obj.hide_viewport]
             if len(showing) != 1:  # exactly one part shows at a time
-                apply_swap(s, max(0, swap_active(s)))
+                labels = [it.label.lower() for it in s.items]
+                start = next((labels.index(w) for w in ("open", "neutral", "closed", "default", "rest")
+                              if w in labels), max(0, swap_active(s)))
+                apply_swap(s, start)
 
 
 # ----------------------------------------------------------------- operators
