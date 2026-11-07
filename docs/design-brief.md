@@ -32,7 +32,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 1. Core: workspace layout, Shoot with holds, shot list, ghost, hide UI, preview/export. **0.1.0 hand-tested OK on Mac.**
 2. Puppet component: rings, swap sets, pin feet. **0.2.0 hand-tested OK on Mac; merged.**
 3. Cameras & light: camera setups + locks, saved views, presets, light per shot. **0.3.0 built on branch step3-cameras-light; logic tested headless; renders checked.**
-4. Solid world: collision-aware drag tool, drop to surface.
+4. Solid world: collision-aware drag tool, drop to surface. **0.4.0 built on branch step4-solid-world; logic tested headless.**
 5. Sculpt: per-shot sculpt, Nomad bridge.
 
 ## Keys

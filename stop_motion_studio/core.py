@@ -154,6 +154,12 @@ def key_pose(scene, frame, objects):
             if c is not None:
                 c.keyframe_insert("influence", frame=frame)
                 touched.add(arm)
+    # Props held in a hand: which hand (if any) is part of the shot.
+    for ob in scene.objects:
+        for c in ob.constraints:
+            if c.name.startswith("SM Hold "):
+                c.keyframe_insert("influence", frame=frame)
+                touched.add(ob)
     # Lighting is part of the shot too: brightness, colour, sky.
     from . import lighting as _lighting
     touched |= _lighting.key_lights(scene, frame)

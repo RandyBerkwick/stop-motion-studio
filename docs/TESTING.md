@@ -15,6 +15,8 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Swaps (shape keys and meshes) and pin on/off are saved with each shot.
 - Camera setups: new from free view, lock (can't move or select), switch filming camera. Saved views round-trip.
 - Studio presets build lights aimed at the puppet; picking another preset replaces them; your own lights switch off and come back with "Use My Own Lights". HDRI presets use Blender's own HDRIs, packed into the file.
+- Solid world: moves stop at surfaces and slide along them, continue past edges (hand slides off the table and on down to the floor), can always back out of something they started inside; a body drag with pinned feet stops when a hand lands on the table; a pinned foot slides along the floor and bumps the table leg.
+- Props drop onto whatever is under them (mug onto the table top, ball onto the floor); holding a prop doesn't make it jump, it then follows the hand; letting go leaves it in place.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -46,11 +48,22 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 22. Shoot 3 shots, step to shot 2, drag the Lamp's brightness down, From here on: shots 2–3 dim, shot 1 stays.
 23. On a shot, Lightning flash: just that shot goes bright white. Lights out: dark from there on.
 
+## Solid world & props (0.4.0)
+24. Run `scripts/make_test_puppet.py` again (it now adds a floating Mug prop), Make Puppet, Set Up Workspace.
+25. Free view: a green ring on the mug. Drag it over the table and let go: it drops onto the table top. Drag it off the edge: it lands on the floor.
+26. Drag the hips ring down: Bramble crouches until his left hand meets the table (or his body meets the floor). The header says "Touching something solid". Hold Ctrl to pass through.
+27. Drag a foot ring down and sideways: it slides along the floor, and stops at a table leg.
+28. Props & Solid World › Mug › Hold in hand (with the mug near a hand): the mug follows the hand as you pose. Let Go: it stays, then drops.
+29. Shoot with the mug held, let go, shoot again, step back: each shot remembers whether it was held.
+30. Turn Solid world off: rings drag freely again (Blender's normal move).
+
 ## Known gaps
 - Shot cards are a grid in the sidebar, not yet the strip from the mockup.
 - Switching the filming camera isn't part of the shots yet (it's for checking angles).
 - The ghost comes from whichever camera took each shot, so it lines up only on that camera.
-- No solid world or sculpt yet (steps 4–5).
+- Twisting (Alt+drag, and joined parts like the head) isn't stopped by solids yet; only moves are.
+- A puppet's own parts can pass through each other (hand into own body).
+- No sculpt yet (step 5).
 - Rigs that already have IK foot controls (e.g. Rigify) get rings on those controls and no extra pins.
 - Pins can flip a knee the wrong way on extreme poses (no knee direction target yet).
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.

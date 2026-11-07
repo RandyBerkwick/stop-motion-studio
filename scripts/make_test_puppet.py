@@ -242,6 +242,14 @@ def build():
             bmesh.ops.create_cube(bmt, size=1.0, matrix=S(x, y, 0.38, 0.05, 0.05, 0.76))
     mesh_object("Table", bmt, [wood], col)
 
+    # a prop to drop and hold: a mug floating above the table (Drop puts it on the top)
+    bmm = bmesh.new()
+    add_tube(bmm, (0, 0, -0.05), (0, 0, 0.05), 0.05, 0)
+    mug = mesh_object("Mug", bmm, [white], col)
+    mug.location = (0.95, 0.1, 1.05)
+    if hasattr(mug, "stop_motion_prop"):
+        mug.stop_motion_prop = True
+
     # --- camera and lights
     cam = bpy.data.objects.new("Camera A", bpy.data.cameras.new("Camera A"))
     cam.data.lens = 35

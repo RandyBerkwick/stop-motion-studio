@@ -3,7 +3,7 @@ import blf
 import bpy
 from bpy.app.handlers import persistent
 
-from . import cameras, core, lighting, puppet
+from . import cameras, core, lighting, puppet, solid
 
 CATEGORY = "Stop Motion"
 
@@ -149,12 +149,46 @@ class SM_PT_swap_popup(bpy.types.Panel):
         draw_swaps(self.layout, arm)
 
 
+class SM_PT_props(bpy.types.Panel):
+    bl_label = "Props & Solid World"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 2
+
+    def draw(self, context):
+        scene = context.scene
+        layout = self.layout
+        layout.prop(scene.stop_motion, "solid_world", toggle=True,
+                    icon='MOD_PHYSICS' if scene.stop_motion.solid_world else 'GHOST_DISABLED')
+        if scene.stop_motion.solid_world:
+            layout.label(text="Dragged parts stop at surfaces · Ctrl passes through")
+        ob = context.active_object
+        if ob is not None and ob.type == 'MESH':
+            row = layout.row(align=True)
+            row.prop(ob, "stop_motion_solid", text="%s is solid" % ob.name)
+        layout.operator("stop_motion.make_prop", text="Make Selected a Prop", icon='OBJECT_DATA')
+        for p in solid.props(scene):
+            box = layout.box()
+            row = box.row(align=True)
+            held = solid.held_by(p)
+            row.label(text=p.name, icon='HAND' if held else 'OBJECT_DATA')
+            row.operator("stop_motion.unprop", text="", icon='X').name = p.name
+            row = box.row(align=True)
+            if held:
+                row.operator("stop_motion.let_go", icon='UNLINKED').name = p.name
+            else:
+                row.operator("stop_motion.hold_prop", text="Hold in hand", icon='LINKED').name = p.name
+                row.operator("stop_motion.drop_prop", text="Drop", icon='SORT_ASC').name = p.name
+            box.prop(p, "stop_motion_falls")
+
+
 class SM_PT_cameras(bpy.types.Panel):
     bl_label = "Cameras & Views"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 2
+    bl_order = 3
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -192,7 +226,7 @@ class SM_PT_lighting(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 3
+    bl_order = 4
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -249,7 +283,7 @@ class SM_PT_shots(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 4
+    bl_order = 5
 
     def draw(self, context):
         scene = context.scene
@@ -279,7 +313,7 @@ class SM_PT_review(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 5
+    bl_order = 6
 
     def draw(self, context):
         sm = context.scene.stop_motion
@@ -301,7 +335,7 @@ class SM_PT_view(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 6
+    bl_order = 7
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -385,7 +419,7 @@ def _register_keys():
         _keymaps.append((km, kmi))
 
 
-classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_cameras, SM_PT_lighting,
+classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_props, SM_PT_cameras, SM_PT_lighting,
            SM_PT_shots, SM_PT_review, SM_PT_view)
 
 

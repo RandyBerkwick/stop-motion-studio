@@ -7,11 +7,12 @@ import bpy
 from bpy.props import IntProperty, StringProperty
 from mathutils import Matrix
 
-from . import puppet
+from . import puppet, solid
 
 RING_COLOR = (0.49, 0.77, 1.0)
 PIN_COLOR = (0.96, 0.78, 0.30)
 HOT_COLOR = (1.0, 0.42, 0.24)
+PROP_COLOR = (0.62, 0.85, 0.55)
 
 
 def ring_world_position(arm, ring):
@@ -43,6 +44,7 @@ class SM_OT_grab_ring(bpy.types.Operator):
         twist = event.alt
         vl = context.view_layer
 
+        solid_world = context.scene.stop_motion.solid_world
         if ring.pin is not None and puppet.is_pinned(arm, ring) and not twist:
             if context.mode != 'OBJECT':
                 bpy.ops.object.mode_set(mode='OBJECT')
@@ -50,7 +52,10 @@ class SM_OT_grab_ring(bpy.types.Operator):
                 ob.select_set(False)
             ring.pin.select_set(True)
             vl.objects.active = ring.pin
-            bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
+            if solid_world:
+                bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
+            else:
+                bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
             return {'FINISHED'}
 
         pb = arm.pose.bones.get(ring.bone)
@@ -70,6 +75,8 @@ class SM_OT_grab_ring(bpy.types.Operator):
         arm.data.bones.active = arm.data.bones[ring.bone]
         if twist or pb.bone.use_connect:
             bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
+        elif solid_world:
+            bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
         else:
             bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
         return {'FINISHED'}
@@ -89,11 +96,12 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
             return False
         if context.screen and context.screen.is_animation_playing:
             return False
-        return bool(puppet.puppets(context.scene))
+        return bool(puppet.puppets(context.scene)) or bool(solid.props(context.scene))
 
     def _signature(self, context):
-        return tuple((arm.name, tuple((r.bone, r.pin.name if r.pin else "") for r in arm.stop_motion_puppet.rings))
-                     for arm in puppet.puppets(context.scene))
+        return (tuple((arm.name, tuple((r.bone, r.pin.name if r.pin else "") for r in arm.stop_motion_puppet.rings))
+                      for arm in puppet.puppets(context.scene)),
+                tuple(p.name for p in solid.props(context.scene)))
 
     def _rebuild(self, context):
         for gz in list(self.gizmos):
@@ -112,6 +120,17 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
                 op.puppet = arm.name
                 op.ring = i
                 self.slots.append((gz, arm.name, i))
+        for ob in solid.props(context.scene):
+            gz = self.gizmos.new("GIZMO_GT_move_3d")
+            gz.draw_style = 'RING_2D'
+            gz.use_draw_modal = False
+            gz.line_width = 3.0
+            gz.alpha = 0.75
+            gz.color = PROP_COLOR
+            gz.color_highlight = HOT_COLOR
+            gz.alpha_highlight = 1.0
+            gz.target_set_operator("stop_motion.grab_prop").name = ob.name
+            self.slots.append((gz, ob.name, -1))
         self.sig = self._signature(context)
 
     def setup(self, context):
@@ -127,6 +146,15 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
         rv3d = context.region_data
         view_rot = rv3d.view_rotation.to_matrix().to_4x4() if rv3d else Matrix()
         for gz, arm_name, i in self.slots:
+            if i < 0:  # a prop
+                ob = bpy.data.objects.get(arm_name)
+                if ob is None or not ob.visible_get():
+                    gz.hide = True
+                    continue
+                gz.hide = False
+                gz.matrix_basis = Matrix.Translation(ob.matrix_world.translation) @ view_rot
+                gz.scale_basis = 0.18
+                continue
             arm = bpy.data.objects.get(arm_name)
             if arm is None or i >= len(arm.stop_motion_puppet.rings):
                 gz.hide = True

@@ -66,6 +66,8 @@ class SM_Settings(bpy.types.PropertyGroup):
     capture_dir: StringProperty(name="Shot pictures", subtype='DIR_PATH',
                                 default="//stopmotion_shots/")
     show_hud: BoolProperty(name="Shot number on camera", default=True)
+    solid_world: BoolProperty(name="Solid world", default=True,
+                              description="Dragged parts and props stop at surfaces instead of passing through")
 
 
 classes = (SM_Shot, SM_Settings)
