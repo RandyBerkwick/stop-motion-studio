@@ -19,6 +19,9 @@ from bpy_extras import anim_utils
 
 GHOST_PREFIX = "SM shot "
 
+# Set by the Studio while it's open: it renders shot pictures itself (off-screen).
+capture_hook = None
+
 
 # ---------------------------------------------------------------- shot timing
 
@@ -275,6 +278,8 @@ def find_camera_area(screen):
 
 def capture(context, scene, uid):
     """Viewport-render the camera view to the shot's picture. Returns path or None."""
+    if capture_hook is not None:
+        return capture_hook(context, scene, uid)
     path = capture_path(scene, uid)
     window = getattr(context, "window", None)
     area, region = find_camera_area(getattr(context, "screen", None))

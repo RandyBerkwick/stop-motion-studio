@@ -8,6 +8,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 ## Decisions
 - Extension, not a fork (fork only if an add-on limit below ever matters).
 - Developed on macOS (Apple Silicon); runs on Windows and Linux too.
+- The app hides Blender completely: the Studio is a full-screen interface drawn by the add-on around one live 3D view, opened by an app template and a Mac launcher (no fork). Hidden way back: Ctrl+Alt+Shift+B.
 - Code lives in GitHub: https://github.com/RandyBerkwick/stop-motion-studio (the claude.ai Project holds the brief and status).
 
 ## Core principles
@@ -33,7 +34,9 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 2. Puppet component: rings, swap sets, pin feet. **0.2.0 hand-tested OK on Mac; merged.**
 3. Cameras & light: camera setups + locks, saved views, presets, light per shot. **0.3.0 hand-tested OK on Mac; merged.**
 4. Solid world: collision-aware drag tool, drop to surface. **0.4.0 hand-tested OK on Mac; merged.**
-5. Sculpt: per-shot sculpt, Nomad bridge. **0.5.0 built on branch step5-sculpt; logic and file round trip tested headless.**
+5. Sculpt: per-shot sculpt, Nomad bridge. **0.5.0 built; logic and file round trip tested headless.**
+
+6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 built on branch studio-ui; interface rendered and checked off-screen; needs a real-window test.**
 
 ## Keys
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.

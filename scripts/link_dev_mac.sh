@@ -27,4 +27,12 @@ if [ -e "$DEST/stop_motion_studio" ] && [ ! -L "$DEST/stop_motion_studio" ]; the
 fi
 ln -sfn "$SRC" "$DEST/stop_motion_studio"
 echo "Linked Blender $BV: $DEST/stop_motion_studio -> $SRC"
+
+# the app template that opens straight into the Studio
+TPL_SRC="$(cd "$(dirname "$0")/.." && pwd)/app_template/StopMotionStudio"
+TPL_DEST="$HOME/Library/Application Support/Blender/$BV/scripts/startup/bl_app_templates_user"
+mkdir -p "$TPL_DEST"
+ln -sfn "$TPL_SRC" "$TPL_DEST/StopMotionStudio"
+echo "Linked app template: $TPL_DEST/StopMotionStudio"
 echo "Restart Blender, then enable Stop Motion Studio in Preferences > Add-ons."
+echo "Then run scripts/make_mac_launcher.sh for a Stop Motion Studio app in ~/Applications."

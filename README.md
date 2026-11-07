@@ -6,6 +6,17 @@ Move-and-shoot stop-motion animation inside full Blender. No in-betweens: pose, 
 - UI mockups: https://claude.ai/artifact/HfsW9bj3bbP72cMpyEZbzC
 - Hand-test checklist: [docs/TESTING.md](docs/TESTING.md)
 
+## The Studio (Blender hidden)
+Stop Motion Studio opens as its own full-screen app: one live 3D view in the middle and the rest of the interface (shoot bar, shot strip, puppet swaps, lighting, sculpt, export) drawn by the add-on around it. Blender's menus, panels and top bar never appear.
+
+- **Mac app:** `scripts/make_mac_launcher.sh` makes *Stop Motion Studio.app* in ~/Applications. It starts Blender with the Stop Motion Studio app template, which opens straight into the Studio.
+- **From Blender:** Ctrl+Alt+Shift+B (or Stop Motion › View › Open the Studio).
+- **The hidden way back:** Ctrl+Alt+Shift+B in the Studio switches to normal Blender for rigging or fixes, and back again.
+
+Your normal Blender theme, preferences and keymap are never changed: the app template keeps its own settings.
+
+`tools/preview_studio.py` renders the Studio off-screen to a PNG (software GPU), for checking the interface without a window.
+
 ## Install (to use it)
 ```sh
 scripts/build.sh
@@ -35,10 +46,31 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | `stop_motion_studio/layout.py` | Stop Motion workspace (camera + free view), hide UI, camera only |
 | `stop_motion_studio/ui.py` | Sidebar panels, shot grid, camera HUD, hotkeys, frame-change handler |
 | `stop_motion_studio/props.py` | Scene settings and the shot list |
+| `stop_motion_studio/studio.py` | The Studio: full-screen mode, input filter, screens, off-screen views and captures |
+| `stop_motion_studio/studio_kit.py` | Studio widgets and layout (no GPU: testable) |
+| `stop_motion_studio/studio_paint.py` | Draws the Studio with Blender's gpu/blf |
+| `app_template/StopMotionStudio` | App template: opens straight into the Studio |
 | `stop_motion_studio/puppet.py` | Make Puppet: ring guessing, swap sets, foot pins |
 | `stop_motion_studio/rings.py` | Grab ring gizmos in the free view and the drag operator |
 
-## Keys (3D view)
+## Keys in the Studio
+| Key | Does |
+|---|---|
+| Enter | Shoot (or replace the shot you're on) |
+| ← / → | Previous / next shot |
+| Tab | Swap the live view and the picture (camera ↔ free view) |
+| Space | Play / pause |
+| Alt+Backspace or Delete | Delete shot |
+| 1–5 | Saved free views |
+| F5 / Esc | Hide / show the interface |
+| F6 | Ghost on / off |
+| Cmd+S / Cmd+O | Save / Projects |
+| Cmd+Z | Undo |
+| Ctrl+Alt+Shift+B | Normal Blender (and back) |
+
+Drag the right edge of a card in the shot strip to hold that shot longer or shorter.
+
+## Keys in normal Blender (3D view)
 | Key | Does |
 |---|---|
 | Enter | Shoot (or replace the shot you're on) |

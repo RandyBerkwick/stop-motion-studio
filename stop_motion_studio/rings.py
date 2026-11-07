@@ -24,6 +24,15 @@ def ring_world_position(arm, ring):
     return arm.matrix_world @ pb.head
 
 
+def _inside(region, rv3d, pos, box):
+    """In the Studio, rings outside the live box would draw over its panels."""
+    if box is None:
+        return True
+    from bpy_extras import view3d_utils
+    p2 = view3d_utils.location_3d_to_region_2d(region, rv3d, pos)
+    return p2 is not None and box.contains(p2.x, p2.y)
+
+
 class SM_OT_grab_ring(bpy.types.Operator):
     """Drag to move this part. Alt+drag to twist it"""
     bl_idname = "stop_motion.grab_ring"
@@ -92,7 +101,10 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
     @classmethod
     def poll(cls, context):
         rv3d = context.region_data
-        if rv3d is None or rv3d.view_perspective == 'CAMERA':
+        if rv3d is None:
+            return False
+        from . import studio
+        if rv3d.view_perspective == 'CAMERA' and not studio.is_active():
             return False
         if context.screen and context.screen.is_animation_playing:
             return False
@@ -145,13 +157,16 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
     def draw_prepare(self, context):
         rv3d = context.region_data
         view_rot = rv3d.view_rotation.to_matrix().to_4x4() if rv3d else Matrix()
+        from . import studio
+        box = studio.live_rect() if studio.is_active() and studio.S.chrome else None
+        region = context.region
         for gz, arm_name, i in self.slots:
             if i < 0:  # a prop
                 ob = bpy.data.objects.get(arm_name)
                 if ob is None or not ob.visible_get():
                     gz.hide = True
                     continue
-                gz.hide = False
+                gz.hide = not _inside(region, rv3d, ob.matrix_world.translation, box)
                 gz.matrix_basis = Matrix.Translation(ob.matrix_world.translation) @ view_rot
                 gz.scale_basis = 0.18
                 continue
@@ -164,7 +179,7 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
             if pos is None:
                 gz.hide = True
                 continue
-            gz.hide = False
+            gz.hide = not _inside(region, rv3d, pos, box)
             gz.matrix_basis = Matrix.Translation(pos) @ view_rot
             gz.scale_basis = 0.22 * ring.size
             gz.color = PIN_COLOR if (ring.pin is not None and puppet.is_pinned(arm, ring)) else RING_COLOR

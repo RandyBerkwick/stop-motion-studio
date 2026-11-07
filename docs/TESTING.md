@@ -19,6 +19,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Props drop onto whatever is under them (mug onto the table top, ball onto the floor); holding a prop doesn't make it jump, it then follows the hand; letting go leaves it in place.
 - Sculpt a shot: a shape key per shot, on only for that shot (or carry on from it); it follows its shot through deletes and survives a pose over; Save as Swap Part renames it into a swap set (Face › Surprised).
 - Nomad bridge: Send writes an OBJ (Y-up, exact round trip); the folder watcher spots the re-exported file and puts the sculpt on that shot; same vertex count is matched point for point, a reordered or triangulated mesh is fitted to the surface.
+- Studio: layout (live box centred, panels tile the window), widget clicks, drags, sliders, wheel, hold handles; shot pictures rendered off-screen and saved; free-view picture renders; drag-to-hold changes holds a frame per card width, never below 1; a failed start rolls back so Blender is never left half-hidden. Screens rendered off-screen and checked by eye.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -67,8 +68,22 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 35. Nomad: Send to Nomad. Show Nomad Folder opens iCloud Drive › Stop Motion Nomad (or the folder you set). On the iPad, in Nomad: Files › Import, turn on **Keep topology** in the advanced options, open the .obj, sculpt (no remesh / dynamic topology), then Files › Export › OBJ, saving over the same file name in the same folder.
 36. Within a couple of seconds of iCloud syncing, the row says "Back from Nomad (same points)" and the shot shows the sculpt. If it says "fitted to surface", the vertices changed in Nomad: the result is close, not exact. Bring Back Now forces it.
 
+## The Studio (0.6.0)
+37. `git pull`, then `scripts/link_dev_mac.sh` (now also links the app template) and `scripts/make_mac_launcher.sh`.
+38. Open ~/Applications › Stop Motion Studio (first time: right-click › Open). Blender starts straight into the Studio, full screen: no Blender menus, top bar or panels. Expect the empty stage (floor, wall, camera). Bring Bramble in for now with Ctrl+Alt+Shift+B › run `scripts/make_test_puppet.py` › Ctrl+Alt+Shift+B back.
+39. Live box shows the camera with an orange frame; the left picture shows the free view. Drag on the picture to turn it, scroll to zoom, click (or Tab) to swap: now the live box is the free view (orbit with the trackpad/middle mouse) and the picture is the camera.
+40. Puppets tab › select the rig (click it in the live view) › Make puppet. Animate tab: rings appear in the live view (only inside the live box, not over the panels). Drag rings, swap parts on the right, Enter to shoot. Thumbnails appear in the strip; ghost shows in the camera.
+41. Click a card to go to it (POSING OVER badge); drag a card's right edge to hold it longer or shorter; − / + and Duplicate / Delete in the shoot bar.
+42. Right tabs: Props, Light, Sculpt work as in the Blender panels. Review & export: Play, speed, Make the movie.
+43. F5 hides everything but the shot number; F5 or Esc brings it back. Save (Cmd+S) puts the project in ~/Stop Motion; Projects lists and opens them.
+44. Ctrl+Alt+Shift+B: normal Blender, same scene. Again: back to the Studio.
+45. Tell me anything that lets Blender's own UI show through (menus, pop-ups, tooltips), and anything that feels slow.
+
 ## Known gaps
-- Shot cards are a grid in the sidebar, not yet the strip from the mockup.
+- In normal Blender the shot cards are still a grid in the sidebar (the Studio has the strip).
+- Studio: no file browser for bringing in a puppet yet (use the hidden way back); swap pop-up (D) not in the Studio; sculpt brushes are Blender's default brush.
+- Studio: Blender's own dialogs (save changes on quit, crash reports) still look like Blender.
+- The Mac launcher still shows Blender's icon in the Dock.
 - Switching the filming camera isn't part of the shots yet (it's for checking angles).
 - The ghost comes from whichever camera took each shot, so it lines up only on that camera.
 - Twisting (Alt+drag, and joined parts like the head) isn't stopped by solids yet; only moves are.

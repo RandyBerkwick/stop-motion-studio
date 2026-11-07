@@ -395,11 +395,11 @@ class SM_PT_view(bpy.types.Panel):
     bl_region_type = 'UI'
     bl_category = CATEGORY
     bl_order = 8
-    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         sm = context.scene.stop_motion
         layout = self.layout
+        layout.operator("stop_motion.studio", text="Open the Studio (Ctrl+Alt+Shift+B)", icon='FULLSCREEN_ENTER')
         layout.operator("stop_motion.toggle_ui", text="Hide UI (F5)", icon='HIDE_ON')
         layout.operator("stop_motion.focus_camera", text="Camera only (Shift F5)", icon='FULLSCREEN_ENTER')
         layout.prop(sm, "key_scope")
