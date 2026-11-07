@@ -154,6 +154,9 @@ def key_pose(scene, frame, objects):
             if c is not None:
                 c.keyframe_insert("influence", frame=frame)
                 touched.add(arm)
+    # Lighting is part of the shot too: brightness, colour, sky.
+    from . import lighting as _lighting
+    touched |= _lighting.key_lights(scene, frame)
     for idb in touched:
         for fc in fcurves_of(idb):
             for kp in fc.keyframe_points:
@@ -173,6 +176,10 @@ def animated_ids(scene):
         if ob.type == 'MESH' and ob.data.shape_keys and ob.data.shape_keys not in seen:
             seen.add(ob.data.shape_keys)
             yield ob.data.shape_keys
+    world = scene.world
+    if world is not None and world.node_tree is not None and world.node_tree not in seen:
+        seen.add(world.node_tree)
+        yield world.node_tree
 
 
 def fcurves_of(idb):

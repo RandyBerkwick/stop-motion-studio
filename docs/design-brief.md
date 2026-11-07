@@ -30,8 +30,8 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 
 ## Build order and status
 1. Core: workspace layout, Shoot with holds, shot list, ghost, hide UI, preview/export. **0.1.0 hand-tested OK on Mac.**
-2. Puppet component: rings, swap sets, pin feet. **0.2.0 built on branch step2-puppet; logic tested headless; rings awaiting hand test.**
-3. Cameras & light: camera setups + locks, saved views, presets, light per shot.
+2. Puppet component: rings, swap sets, pin feet. **0.2.0 hand-tested OK on Mac; merged.**
+3. Cameras & light: camera setups + locks, saved views, presets, light per shot. **0.3.0 built on branch step3-cameras-light; logic tested headless; renders checked.**
 4. Solid world: collision-aware drag tool, drop to surface.
 5. Sculpt: per-shot sculpt, Nomad bridge.
 
@@ -43,7 +43,10 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Python can't add a new editor type; the shot timeline is drawn in panels/viewport.
 - Licence: add-ons using bpy are GPL.
 
+## Decided defaults (can change)
+- Switching camera setups is for checking angles; it isn't recorded in shots (yet).
+- Light changes hold until changed again: lights are keyed with every shot.
+
 ## Open questions
-- Camera switches as edit points in the film, or angle-checking only?
-- Light changes hold until changed again, or only on dropped shots?
+- Should camera switches become edit points in the film (cut to camera B for shots 20–30)?
 - Pose over a sculpted shot: keep sculpt or reset?

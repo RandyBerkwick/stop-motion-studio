@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "stop_motion_studio"
-version = "0.2.0"
+version = "0.3.0"
 name = "Stop Motion Studio"
 tagline = "Move and shoot stop-motion animation, no in-betweens"
 maintainer = "Gregory"

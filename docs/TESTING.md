@@ -13,6 +13,9 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Make Puppet finds rings (head, body, hips, hands, feet) from bone names, and swap sets from shape keys named `Set_Part` and from meshes parented to the rig named `Set_Part`.
 - Feet on simple two-bone legs get an IK pin: moving the hips leaves pinned feet where they are; unpinning doesn't make the foot jump.
 - Swaps (shape keys and meshes) and pin on/off are saved with each shot.
+- Camera setups: new from free view, lock (can't move or select), switch filming camera. Saved views round-trip.
+- Studio presets build lights aimed at the puppet; picking another preset replaces them; your own lights switch off and come back with "Use My Own Lights". HDRI presets use Blender's own HDRIs, packed into the file.
+- Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
 1. Open a file with a camera and a rigged puppet. In the 3D view sidebar (N) › Stop Motion › "Set Up Stop Motion Workspace". Expect: a new "Stop Motion" tab with the camera view on the left and the free view on the right.
@@ -35,9 +38,19 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 16. Shoot two shots with different mouths, step back: each shot keeps its own mouth.
 17. Tell me if the rings are too big or too small (the size slider per ring helps for now).
 
+## Cameras & lighting (0.3.0)
+18. Stop Motion › Cameras & Views › New from free view: a new camera appears where the free view is looking from, and the camera view switches to it.
+19. Lock a camera (padlock): it can't be clicked or moved. Move camera: navigate inside the camera view to move it; Move camera again to stop.
+20. Save this view in the free view, look somewhere else, click the eye icon: the free view jumps back.
+21. Lighting › Three-point, then Moonlight, then Golden hour: each relights the set (camera view shows the lighting). Use My Own Lights brings the test scene's lights back.
+22. Shoot 3 shots, step to shot 2, drag the Lamp's brightness down, From here on: shots 2–3 dim, shot 1 stays.
+23. On a shot, Lightning flash: just that shot goes bright white. Lights out: dark from there on.
+
 ## Known gaps
 - Shot cards are a grid in the sidebar, not yet the strip from the mockup.
-- No cameras, lighting, solid world or sculpt yet (steps 3–5).
+- Switching the filming camera isn't part of the shots yet (it's for checking angles).
+- The ghost comes from whichever camera took each shot, so it lines up only on that camera.
+- No solid world or sculpt yet (steps 4–5).
 - Rigs that already have IK foot controls (e.g. Rigify) get rings on those controls and no extra pins.
 - Pins can flip a knee the wrong way on extreme poses (no knee direction target yet).
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.

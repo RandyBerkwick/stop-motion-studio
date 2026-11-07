@@ -3,7 +3,7 @@ import blf
 import bpy
 from bpy.app.handlers import persistent
 
-from . import core, puppet
+from . import cameras, core, lighting, puppet
 
 CATEGORY = "Stop Motion"
 
@@ -149,12 +149,107 @@ class SM_PT_swap_popup(bpy.types.Panel):
         draw_swaps(self.layout, arm)
 
 
+class SM_PT_cameras(bpy.types.Panel):
+    bl_label = "Cameras & Views"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 2
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene = context.scene
+        layout = self.layout
+        col = layout.column(align=True)
+        for cam in cameras.cameras(scene):
+            row = col.row(align=True)
+            filming = cam == scene.camera
+            row.operator("stop_motion.use_camera", text="",
+                         icon='RADIOBUT_ON' if filming else 'RADIOBUT_OFF',
+                         depress=filming).name = cam.name
+            row.prop(cam, "name", text="")
+            locked = cameras.is_locked(cam)
+            row.operator("stop_motion.lock_camera", text="",
+                         icon='LOCKED' if locked else 'UNLOCKED', depress=locked).name = cam.name
+        row = layout.row(align=True)
+        row.operator("stop_motion.new_camera", text="New from free view", icon='ADD')
+        area, _r = core.find_camera_area(context.screen)
+        moving = area is not None and area.spaces.active.lock_camera
+        row.operator("stop_motion.move_camera", text="Move camera", icon='VIEW_CAMERA', depress=moving)
+
+        layout.label(text="Saved free views")
+        col = layout.column(align=True)
+        for i, v in enumerate(scene.stop_motion_views):
+            row = col.row(align=True)
+            row.operator("stop_motion.go_view", text="", icon='HIDE_OFF').index = i
+            row.prop(v, "name", text="")
+            row.operator("stop_motion.forget_view", text="", icon='X').index = i
+        layout.operator("stop_motion.save_view", icon='BOOKMARKS')
+
+
+class SM_PT_lighting(bpy.types.Panel):
+    bl_label = "Lighting"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 3
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        scene = context.scene
+        wm = context.window_manager
+        layout = self.layout
+        layout.label(text="Studio lights")
+        grid = layout.grid_flow(row_major=True, columns=2, even_columns=True, align=True)
+        for key, (label, _l, _w, _s) in lighting.STUDIO.items():
+            grid.operator("stop_motion.light_preset", text=label).preset = key
+        layout.label(text="HDRI skies & rooms")
+        grid = layout.grid_flow(row_major=True, columns=2, even_columns=True, align=True)
+        for key, (label, _f, _s) in lighting.HDRI.items():
+            grid.operator("stop_motion.hdri_preset", text=label).preset = key
+        row = layout.row(align=True)
+        row.operator("stop_motion.load_hdri", icon='FILE_IMAGE')
+        row.operator("stop_motion.own_lights", icon='LIGHT')
+        turn = lighting.hdri_turn_socket(scene)
+        bg = lighting.world_background(scene)
+        if bg is not None:
+            row = layout.row(align=True)
+            row.prop(bg.inputs["Strength"], "default_value", text="Sky strength")
+            if turn is not None and bg.inputs["Color"].is_linked:
+                row.prop(turn, "default_value", index=2, text="Turn")
+
+        lights = [o for o in scene.objects if o.type == 'LIGHT' and o.visible_get()]
+        if lights:
+            box = layout.box()
+            for ob in lights:
+                row = box.row(align=True)
+                row.label(text=ob.name, icon='LIGHT_%s' % ob.data.type)
+                row.prop(ob.data, "energy", text="")
+                row.prop(ob.data, "color", text="")
+        idx = core.shot_index_at(scene, scene.frame_current)
+        layout.label(text="Keep this lighting in" + ("" if idx >= 0 else " (live: next Shoot keeps it)"))
+        row = layout.row(align=True)
+        row.enabled = idx >= 0
+        row.operator("stop_motion.apply_light", text="This shot").scope = 'THIS'
+        row.operator("stop_motion.apply_light", text="From here on").scope = 'FROM_HERE'
+        layout.operator("stop_motion.apply_light", text="Every shot").scope = 'EVERY'
+
+        layout.label(text="Light effects (from this shot)")
+        layout.prop(wm, "stop_motion_effect_count")
+        grid = layout.grid_flow(row_major=True, columns=2, even_columns=True, align=True)
+        grid.enabled = idx >= 0
+        for key, label, _d in lighting.EFFECTS:
+            op = grid.operator("stop_motion.light_effect", text=label)
+            op.effect = key
+            op.count = wm.stop_motion_effect_count
+
+
 class SM_PT_shots(bpy.types.Panel):
     bl_label = "Shots"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 2
+    bl_order = 4
 
     def draw(self, context):
         scene = context.scene
@@ -184,7 +279,7 @@ class SM_PT_review(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 3
+    bl_order = 5
 
     def draw(self, context):
         sm = context.scene.stop_motion
@@ -206,7 +301,7 @@ class SM_PT_view(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = CATEGORY
-    bl_order = 4
+    bl_order = 6
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -290,7 +385,8 @@ def _register_keys():
         _keymaps.append((km, kmi))
 
 
-classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_shots, SM_PT_review, SM_PT_view)
+classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_cameras, SM_PT_lighting,
+           SM_PT_shots, SM_PT_review, SM_PT_view)
 
 
 def register():
