@@ -8,21 +8,21 @@ Move-and-shoot stop-motion animation inside full Blender. No in-betweens: pose, 
 
 ## Install (to use it)
 ```sh
-scripts/build.sh            # makes dist/stop_motion_studio-<version>.zip
+scripts/build.sh
 ```
-Blender › Preferences › Get Extensions › ▾ › Install from Disk… › pick the zip.
+This makes `dist/stop_motion_studio-<version>.zip`. Blender › Preferences › Get Extensions › ▾ › Install from Disk… › pick the zip.
 
 ## Develop on a Mac
 ```sh
-scripts/link_dev_mac.sh     # links the add-on into Blender 5.2's extensions folder
+scripts/link_dev_mac.sh
 ```
-Restart Blender and enable **Stop Motion Studio** in Preferences › Add-ons. After editing code, press F3 › "Reload Scripts" in Blender: no reinstall needed.
+This links the add-on into the extensions folder of the Blender in /Applications (or pass a version, e.g. `scripts/link_dev_mac.sh 5.2`). Fully quit and restart Blender and enable **Stop Motion Studio** in Preferences › Add-ons. After editing code, press F3 › "Reload Scripts" in Blender: no reinstall needed.
 
 Run the headless tests with the Blender app:
 ```sh
-scripts/run_tests_mac.sh    # set BLENDER=/path/to/Blender if it isn't in /Applications
+scripts/run_tests_mac.sh
 ```
-The tests cover the shot model (shoot, hold, pose over, delete, duplicate, ghost). Shot pictures need a real window, so they're skipped in headless runs.
+Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the shot model (shoot, hold, pose over, delete, duplicate, ghost). Shot pictures need a real window, so they're skipped in headless runs.
 
 ## Layout
 | Path | What |
