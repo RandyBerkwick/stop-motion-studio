@@ -8,7 +8,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 ## Decisions
 - Extension, not a fork (fork only if an add-on limit below ever matters).
 - Developed on macOS (Apple Silicon); runs on Windows and Linux too.
-- Code lives in a GitHub repo; the claude.ai Project holds the brief and status.
+- Code lives in GitHub: https://github.com/RandyBerkwick/stop-motion-studio (the claude.ai Project holds the brief and status).
 
 ## Core principles
 - Move and shoot. No in-betweens: every key is constant, every shot is exactly the pose you shot.
