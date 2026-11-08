@@ -24,6 +24,7 @@ from bpy_extras import view3d_utils
 from mathutils import Matrix, Quaternion, Vector
 
 from . import cameras, core, library, lighting, ops, puppet, sculpt, solid
+from . import studio_puppets as sp
 from .studio_kit import Kit, Rect, Theme, studio_layout
 
 PROJECTS_DIR = os.path.join(os.path.expanduser("~"), "Stop Motion")
@@ -456,6 +457,8 @@ def draw_studio():
     draw_right(kit, L["right"], ctx, scene, s)
     draw_footer(kit, L["footer"], scene, s)
     draw_live_badge(kit, live, scene, s)
+    if S.mode == 'PUPPETS':
+        sp.draw_live(kit, live, ctx, s)
     if S.overlay == 'PROJECTS':
         draw_projects(kit, L["full"], s)
     elif S.overlay == 'LIBRARY':
@@ -515,6 +518,11 @@ def set_mode(mode):
     S.mode = mode
     if mode == 'PUPPETS' and S.side not in ('PUPPET', 'PROPS'):
         S.side = 'PUPPET'
+    if mode == 'PUPPETS':
+        try:
+            sp.enter()
+        except Exception as exc:
+            print("Stop Motion: puppet studio:", exc)
     if mode == 'REVIEW' and S.live != 'CAMERA':
         swap_views()
     redraw()
@@ -528,6 +536,17 @@ def set_overlay(name):
 def draw_view_headers(kit, L, scene, s):
     t = Theme
     hl, hc, hr = L["head_left"], L["head_centre"], L["head_right"]
+    if S.mode == 'PUPPETS':
+        sp.draw_headers(kit, hl, hc, s)
+        if sp.P.start == 'RIG':
+            tabs = (('PUPPET', "Set up puppet"), ('PROPS', "Set & props"))
+            cells = Rect(hr.x + 10 * s, hr.cy - 16 * s, hr.w - 20 * s, 32 * s).split_cols(len(tabs), 2 * s)
+            for (key, label), cell in zip(tabs, cells):
+                kit.button("side:" + key, cell, label, (lambda k=key: set_side(k)), "tab", S.side == key, size=12)
+        else:
+            name = dict(sp.STEPS).get(sp.P.step, "")
+            kit.label(Rect(hr.x + 18 * s, hr.y, hr.w, hr.h), name.upper(), 12, t.soft, "left", True)
+        return
     other = "FREE VIEW" if S.live == 'CAMERA' else "CAMERA"
     kit.label(Rect(hl.x + 16 * s, hl.y, hl.w, hl.h), other + "  ·  Tab swaps", 12,
               t.blue if S.live == 'CAMERA' else t.accent, "left", True)
@@ -606,6 +625,8 @@ def draw_left(kit, r, ctx, scene, s):
     inner = r.inset(16 * s, 14 * s)
     if S.mode == 'REVIEW':
         draw_review_left(kit, inner, scene, s)
+        return
+    if S.mode == 'PUPPETS' and sp.draw_left(kit, inner, ctx, scene, s, Column):
         return
     # the other view, as a picture: click swaps, drag turns it (free view), wheel zooms
     aspect = scene.render.resolution_x / max(1, scene.render.resolution_y) if S.live == 'FREE' else 1.0
@@ -742,6 +763,8 @@ def play():
 def draw_right(kit, r, ctx, scene, s):
     inner = r.inset(16 * s, 14 * s)
     inner = Rect(inner.x + 1 * s, inner.y, inner.w - 1 * s, inner.h)
+    if S.mode == 'PUPPETS' and sp.draw_right(kit, inner, ctx, scene, s, Column):
+        return
     if S.mode == 'REVIEW':
         draw_export(kit, inner, scene, s)
     elif S.side == 'PUPPET':
@@ -1429,6 +1452,9 @@ class SM_OT_studio_loop(bpy.types.Operator):
         if t == 'LEFTMOUSE':
             if v == 'PRESS':
                 if kit.on_press(mx, my):
+                    area.tag_redraw()
+                    return {'RUNNING_MODAL'}
+                if in_live and S.overlay is None and S.mode == 'PUPPETS' and sp.live_click(context, mx, my):
                     area.tag_redraw()
                     return {'RUNNING_MODAL'}
                 return {'PASS_THROUGH'} if (in_live and S.overlay is None) else {'RUNNING_MODAL'}

@@ -24,6 +24,7 @@ While the Studio is open, quitting saves your work instead of showing Blender's 
 - **Camera cuts:** each shot remembers the camera that filmed it. Click a camera while live: the next shots film with it. Click one while on a shot: that shot and the rest of its run (up to the next cut) cut to it. Playback and export follow the cuts; cuts show as yellow marks in the strip.
 - **Puppets:** Make Puppet turns a rig into grab rings (drag moves, Alt+drag turns, Shift: nearer/further, X/Y/Z: one direction, twice: the part's own axis), swap parts (D for the pop-up), foot pins with knee targets. Rigs with their own IK feet use their IK as the pin.
 - **Solid world:** parts and props stop at the set and at the puppet's own other parts; props drop onto surfaces and can be held in a hand.
+- **Puppet studio (Puppets tab):** build a puppet three ways. *Parts kit:* pick a person, small child, tall or four-legged wire armature; it starts with a full set of clay parts (heads, bodies, arms, legs, feet, paws, tails) to swap and colour; sliders set height, head size, arm or body length and leg length, and the parts are remade to fit. *A sculpt:* joints are guessed on a one-piece sculpt (from Nomad, say); click in the clay to move one (it goes in the middle of the clay), left copies to right; Make the rig skins it. *A rig:* the original setup for a rig you already have. Then face & hands (replacement mouths, eyes, brows, mitten or finger hands, picked shot by shot), Try it (test poses that flag folding clay, parts running into each other and flipped knees, each with a fix), and Save to the library with its picture.
 - **Library (Bring in…):** puppets, props and set pieces kept as .blend files in ~/Stop Motion/Library; bring one in and it stands where the camera is looking, set up and ready. "Add what's selected" keeps something for other projects.
 - **Arranging the set:** slide things along surfaces (they stop at what stands there), stamp copies by clicking or painting a stroke, set pieces stay put in every shot.
 - **Light:** studio and sky presets, light per shot, effects: flicker, lightning flash, fade to night, lights out, torch sweep.
@@ -71,6 +72,11 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | `stop_motion_studio/gif.py` | Animated GIF writer (palette, LZW) |
 | `stop_motion_studio/strip.py` | Shot strip along the bottom of the camera view in normal Blender |
 | `stop_motion_studio/macos.py` | Dock icon (macOS) |
+| `stop_motion_studio/assembly.py` | Puppet studio: armature templates, proportions, the clay parts kit, skinning |
+| `stop_motion_studio/faces.py` | Puppet studio: mouths, eyes, brows and hands as swap parts |
+| `stop_motion_studio/rigsculpt.py` | Puppet studio: joints on a sculpt, making its rig |
+| `stop_motion_studio/trial.py` | Puppet studio: test poses, problem checks and fixes, saving |
+| `stop_motion_studio/studio_puppets.py` | The Studio's Puppets mode |
 
 ## Keys in the Studio
 | Key | Does |

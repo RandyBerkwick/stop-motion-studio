@@ -324,6 +324,76 @@ class SM_PT_lighting(bpy.types.Panel):
             op.count = wm.stop_motion_effect_count
 
 
+class SM_PT_puppet_studio(bpy.types.Panel):
+    bl_label = "Puppet Studio"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 1
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        import json
+        from . import assembly, faces, rigsculpt, trial
+        layout = self.layout
+        arm = assembly._arm(context)
+        if arm is None:
+            layout.label(text="Build a new puppet:")
+            grid = layout.grid_flow(columns=2, align=True)
+            for k, (label, _h, _b) in assembly.TEMPLATES.items():
+                grid.operator("stop_motion.new_build", text=label).template = k
+            ob = context.active_object
+            if ob is not None and ob.type == 'MESH' and not ob.get("sm_part"):
+                box = layout.box()
+                box.label(text="Rig %s (a sculpt)" % ob.name, icon='ARMATURE_DATA')
+                row = box.row(align=True)
+                op = row.operator("stop_motion.guess_joints", text="Guess joints (person)")
+                op.mesh, op.template = ob.name, 'PERSON'
+                op = row.operator("stop_motion.guess_joints", text="Four legs")
+                op.mesh, op.template = ob.name, 'FOUR_LEGS'
+                n = len(rigsculpt.get_joints(ob))
+                box.label(text="%d joints placed" % n if n else "No joints yet")
+                box.operator("stop_motion.make_sculpt_rig", icon='CHECKMARK').mesh = ob.name
+            return
+        info = assembly.build_info(arm)
+        layout.label(text="%s · %s" % (arm.name, assembly.TEMPLATES[info["template"]][0]), icon='ARMATURE_DATA')
+        if not info.get("sculpt"):
+            on = {p["kind"]: p for p in info.get("parts", [])}
+            for kind, (label, variants) in assembly.kit_for(arm).items():
+                row = layout.row(align=True)
+                row.label(text=label)
+                for vid, vlabel in variants:
+                    op = row.operator("stop_motion.build_part", text=vlabel.split()[0],
+                                      depress=on.get(kind, {}).get("variant") == vid)
+                    op.puppet, op.kind, op.variant = arm.name, kind, vid
+            box = layout.box()
+            box.label(text="Proportions (100 = normal)")
+            for key in ("height", "head", "arms", "legs"):
+                row = box.row(align=True)
+                row.label(text=assembly.prop_label(info["template"], key))
+                v = info["props"].get(key, 1.0)
+                for d, txt in ((-0.1, "−"), (0.1, "+")):
+                    op = row.operator("stop_motion.build_shape", text=txt)
+                    op.puppet, op.prop, op.value = arm.name, key, max(0.6, min(1.5, v + d))
+                row.label(text="%d" % round(v * 100))
+        row = layout.row(align=True)
+        row.operator("stop_motion.make_faces", text="Face & hands", icon='MONKEY').puppet = arm.name
+        if info["template"] != 'FOUR_LEGS':
+            for st, txt in (('MITTEN', "Mitten"), ('FINGERS', "Fingers")):
+                op = row.operator("stop_motion.hand_style", text=txt)
+                op.puppet, op.style = arm.name, st
+        row = layout.row(align=True)
+        row.operator("stop_motion.finish_build", text="Rings & pins", icon='CHECKMARK').puppet = arm.name
+        row.operator("stop_motion.try_puppet", text="Try it out", icon='PLAY').puppet = arm.name
+        for r in trial.last_results(arm):
+            for p in r["problems"]:
+                row = layout.row(align=True)
+                row.label(text="%s (%s)" % (p["text"], r["name"].lower()), icon='ERROR')
+                op = row.operator("stop_motion.fix_puppet", text=p["fix_label"])
+                op.puppet, op.what = arm.name, p["fix"]
+        layout.operator("stop_motion.save_puppet", icon='FILE_TICK').puppet = arm.name
+
+
 class SM_PT_sculpt(bpy.types.Panel):
     bl_label = "Sculpt a Shot"
     bl_space_type = 'VIEW_3D'
@@ -590,7 +660,7 @@ def _register_keys():
         _keymaps.append((km, kmi))
 
 
-classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_props, SM_PT_cameras, SM_PT_lighting, SM_PT_sculpt,
+classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet_studio, SM_PT_puppet, SM_PT_swap_popup, SM_PT_props, SM_PT_cameras, SM_PT_lighting, SM_PT_sculpt,
            SM_PT_shots, SM_PT_review, SM_PT_library, SM_PT_view)
 
 

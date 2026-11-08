@@ -41,6 +41,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 8. Solid twist: turning parts and props stops where they'd touch something. **0.8.0 tested headless; merged.**
 9. 3D move and turn: further/nearer (Shift or wheel), X/Y/Z locks with a guide line, trackball turning, turns around one axis or the view; solid or not. **0.9.0 built; tested headless.**
 10. Round 2: camera cuts, GIF and Blender-scene export, review modes (loop, back and forth, last N); library (bring in puppets/props/sets), swap pop-up and clay tools in the Studio; own parts solid, knee targets, rigs with IK feet, held props in 3D, own-axis locks, arranging stops at things on the surface; painting copies, torch sweep, shot strip in normal Blender, Studio Dock icon, save on quit. **1.0.0 built on branch finish; tested headless and rendered.**
+11. Library pictures; puppet studio: build from a parts kit on a wire armature (person, small child, tall, four legs) with proportions, or place joints on a sculpt; face & hands swap sets (mouths picked by hand); try it with test poses and fixes; save to the library. **1.1.0 built on branch finish; tested headless and rendered.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
@@ -58,5 +59,7 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Posing over a sculpted shot keeps its sculpt.
 - Nomad bridge is a file round trip (OBJ in iCloud Drive › Stop Motion Nomad); in Nomad, import with "Keep topology" for an exact match.
 
+- Puppet studio: a parts-kit puppet skips the Joints step (the armature is the rig). Mouths are picked by hand, shot by shot (no automatic lip sync). Four-legged puppets are in from the start.
+
 ## Open questions
-- Library thumbnails: render a picture of each item when it's added?
+- Which kit parts to add next (hair, hats, clothes, animal kinds)?

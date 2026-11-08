@@ -75,6 +75,51 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         scene.frame_current = core.live_frame(scene)
     studio.S.mode = mode
     studio.S.side = side
+    pstep = os.environ.get("SM_PREVIEW_PSTUDIO")
+    if pstep:
+        from stop_motion_studio import assembly, faces, studio_puppets as sp, trial, rigsculpt
+        if pstep == 'JOINTS':
+            # a one-piece sculpt to place joints on: a kit puppet melted into one mesh
+            ref = assembly.new_build(ctx, "Ref", 'PERSON', location=(3.0, 0.0, 0.0)); assembly.starter(ctx, ref)
+            import bmesh as _bm
+            dg = ctx.evaluated_depsgraph_get(); bm = _bm.new()
+            for o in assembly.kit_parts(ref):
+                me = bpy.data.meshes.new_from_object(o.evaluated_get(dg)); me.transform(o.matrix_world); bm.from_mesh(me)
+            me = bpy.data.meshes.new("Wren"); bm.to_mesh(me); bm.free()
+            wren = bpy.data.objects.new("Wren", me); scene.collection.objects.link(wren)
+            wren.data.materials.append(assembly.clay("green"))
+            for o in list(ref.children_recursive) + [ref]: bpy.data.objects.remove(o)
+            vl.update()
+            j = rigsculpt.guess(ctx, wren, 'PERSON')
+            for k in ("wrist.L", "wrist.R", "fingertip.L", "fingertip.R", "hip.L", "hip.R", "knee.L", "knee.R", "ankle.L", "ankle.R", "toe.L", "toe.R"):
+                j.pop(k, None)
+            rigsculpt.set_joints(wren, j)
+            for o in ctx.selected_objects: o.select_set(False)
+            vl.objects.active = wren
+            sp.P.start, sp.P.step, sp.P.joint = 'SCULPT', 'JOINTS', 8
+            focus = [wren]
+        else:
+            pip = assembly.new_build(ctx, "Pip", 'PERSON', location=(3.0, 0.0, 0.0))
+            assembly.starter(ctx, pip)
+            assembly.add_part(ctx, pip, "body", "pear", "red"); assembly.set_colour(ctx, pip, "arms", "red")
+            if pstep in ('FACE', 'TRY', 'SAVE'):
+                faces.make_all(ctx, pip); assembly.finish_build(ctx, pip)
+            if pstep == 'TRY':
+                trial.try_out(ctx, pip)
+                res = trial.last_results(pip)
+                res[0]["problems"].append({"kind": "FOLDS", "part": "Pip Arms R", "text": "Arms (right) folds in", "fix": "SOFTEN", "fix_label": "Soften joints"})
+                pip["sm_try"] = __import__("json").dumps(res)
+            vl.objects.active = pip
+            sp.P.start, sp.P.step, sp.P.kind = 'PARTS', pstep, "body"
+            sp.P.set_name = "Mouth"
+            focus = [o for o in pip.children if o.type == 'MESH' and not o.hide_render]
+        pts = [o.matrix_world @ __import__("mathutils").Vector(c) for o in focus for c in o.bound_box]
+        lo = __import__("mathutils").Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+        hi = __import__("mathutils").Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+        studio.S.free.location = (lo + hi) / 2
+        studio.S.free.distance = (hi - lo).length * 1.25
+        studio.S.free_init = True
+        studio.S.live = 'FREE'
     if env("SM_PREVIEW_LIB"):
         from stop_motion_studio import library
         library.LIBRARY_DIR = env("SM_PREVIEW_LIB")
@@ -98,11 +143,11 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
     if not REAL:
         studio.render_view = lambda c, key, w, h, which: FakeOff(gpu.texture.from_image(live_img))
     else:
-        studio.init_free_view(scene)
-        cam_off = studio.render_view(ctx, "live", 1024, 576, 'CAMERA')   # stands in for the live 3D view
+        if not os.environ.get("SM_PREVIEW_PSTUDIO"): studio.init_free_view(scene)
+        cam_off = studio.render_view(ctx, "live", 1024, 576, 'FREE' if os.environ.get("SM_PREVIEW_PSTUDIO") else 'CAMERA')   # stands in for the live 3D view
         # Render the picture now: nesting off-screen buffers inside the preview's own one isn't supported
         # (in Blender the Studio draws straight to the window, so it doesn't arise there).
-        pic_off = studio.render_view(ctx, "picture", 268, 268, 'FREE')
+        pic_off = studio.render_view(ctx, "picture", 268, 268, 'CAMERA' if os.environ.get("SM_PREVIEW_PSTUDIO") else 'FREE')
         studio.render_view = lambda c, key, w, h, which: pic_off
 
     off = gpu.types.GPUOffScreen(W, H)
@@ -137,6 +182,8 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         studio.draw_right(kit, L["right"], ctx, scene, s)
         studio.draw_footer(kit, L["footer"], scene, s)
         studio.draw_live_badge(kit, live, scene, s)
+        if studio.S.mode == 'PUPPETS':
+            studio.sp.draw_live(kit, live, ctx, s)
         ov = os.environ.get("SM_PREVIEW_OVERLAY")
         if ov:
             studio.S.overlay = ov

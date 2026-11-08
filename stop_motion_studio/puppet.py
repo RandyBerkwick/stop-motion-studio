@@ -191,7 +191,7 @@ def guess_swap_sets(arm, scene):
     for ob in meshes:
         if ob.parent != arm or ob.get("sm_part"):   # kit body parts aren't swaps
             continue
-        pre, rest = _split(ob.name)
+        pre, rest = _split(re.sub(r"\.\d{3}$", "", ob.name))   # Mouth_O.001 is still Mouth_O
         if pre:
             groups.setdefault(pre, []).append((_nice(rest), ob))
     for pre, items in groups.items():
