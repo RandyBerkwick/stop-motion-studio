@@ -43,6 +43,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 10. Round 2: camera cuts, GIF and Blender-scene export, review modes (loop, back and forth, last N); library (bring in puppets/props/sets), swap pop-up and clay tools in the Studio; own parts solid, knee targets, rigs with IK feet, held props in 3D, own-axis locks, arranging stops at things on the surface; painting copies, torch sweep, shot strip in normal Blender, Studio Dock icon, save on quit. **1.0.0 built on branch finish; tested headless and rendered.**
 11. Library pictures; puppet studio: build from a parts kit on a wire armature (person, small child, tall, four legs) with proportions, or place joints on a sculpt; face & hands swap sets (mouths picked by hand); try it with test poses and fixes; save to the library. **1.1.0 built on branch finish; tested headless and rendered.**
 12. Friendly looks: five styles mocked up (Playroom, Sketchbook, Plasticine, Night studio, First steps); Sketchbook picked and drawn out on four screens, then built into the Studio as a look you switch from the top bar (squared paper, wobbly ink outlines with offset shadows, highlighter for what's picked, Patrick Hand and Kalam fonts shipped under the OFL). **1.2.0 built on branch finish; tested headless and rendered.**
+13. Help: a "How to…" column for every view (13 guides, 2–8 steps each) with small looping pictures drawn live in the Studio's own look: animating, building a scene, bringing things in, lighting, sculpting, watching and sharing, building/rigging/face/try/save in the puppet studio, projects. **1.3.0 built on branch finish; tested headless and rendered.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
@@ -56,6 +57,7 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Camera cuts: each shot remembers its camera. Live, picking a camera sets the next shots; on a shot, it changes that shot and the rest of its run up to the next cut. Cuts are camera markers, so playback, export and the Blender-scene copy follow them.
 - Quitting from the Studio saves instead of asking (unsaved projects go to ~/Stop Motion).
 - The Studio's look (Dark studio or Sketchbook) is a preference, not part of the project, so it follows the person, not the file. Dark stays the default.
+- Help opens beside the Studio (its own column on the left), never over it, so you can follow a guide while doing it. It follows the view unless you browse to another guide.
 - The library is a folder of .blend files (~/Stop Motion/Library).
 - Light changes hold until changed again: lights are keyed with every shot.
 - Posing over a sculpted shot keeps its sculpt.

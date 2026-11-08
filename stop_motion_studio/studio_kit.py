@@ -137,7 +137,7 @@ class Rect:
         return Rect(self.x, self.cy - h / 2, self.w, h)
 
 
-def studio_layout(width, height, s=1.0, chrome=True):
+def studio_layout(width, height, s=1.0, chrome=True, help_open=False):
     """The Studio's regions, in pixels. `s` is the UI scale.
 
     Left and right columns are the same width and the top band matches the
@@ -147,15 +147,18 @@ def studio_layout(width, height, s=1.0, chrome=True):
     if not chrome:
         return {"full": full, "live": full}
     top_bar, rest = full.take_top(56 * s)
-    headers, rest = rest.take_top(52 * s)
     footer, rest = rest.take_bottom(140 * s)
-    side = min(300 * s, width * 0.24)
+    help_col = None
+    if help_open:   # the help column sits on the far left, between the top bar and the footer
+        help_col, rest = rest.take_left(min(320 * s, width * 0.24))
+    headers, rest = rest.take_top(52 * s)
+    side = min(300 * s, rest.w * 0.24)
     left, rest = rest.take_left(side)
     right, live = rest.take_right(side)
     lh, hrest = headers.take_left(side)
     rh, ch = hrest.take_right(side)
     return {"full": full, "top": top_bar, "head_left": lh, "head_centre": ch, "head_right": rh,
-            "left": left, "right": right, "live": live, "footer": footer}
+            "left": left, "right": right, "live": live, "footer": footer, "help": help_col}
 
 
 # ------------------------------------------------------------------ kit

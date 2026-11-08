@@ -37,6 +37,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Library pictures: made when something's added (three-quarter front view, clear background); files without one get theirs from the file, leaving nothing behind; project pictures are the last shot.
 - Hand shapes: six per hand; a hand sculpted on one shot and kept becomes a new shape in that hand's set, used by that shot only, with the one-off sculpt removed.
 - Puppet studio: a person from the kit has 8 parts (pairs for arms, legs, feet); bending parts are skinned with every point weighted, heads and feet ride their bone; feet on the floor; swapping and colouring parts; a bigger head makes a bigger head part, longer legs a taller puppet still on the floor, colours kept. Face sets (8 mouths, 5 eyes, 3 brows, both hands with 4 shapes) sit on the front of the face, eyes above the mouth, one showing, swapping works, remade when the head changes. Four legs: rings for head, body, hips, tail and four feet, all four pinned with knee targets; a person changed to four legs keeps only parts that fit. Test poses are tried and the puppet goes back to standing; a hard fold with volume keeping off is noticed; Soften joints remakes the parts softer. A sculpt made from a kit puppet: joints guessed within 2 cm; a click puts a joint in the middle of the clay and mirrors it; Make the rig gives 7 rings, 2 pins, every point weighted (separate bits like ears too), nodding moves the head and not the feet. Saved puppets come back from the library with rings, swaps and pins. The Studio's Puppets mode: steps, building, sliders applied after a pause, faces, trying, saving, a sculpt rigged. Screens rendered and checked by eye.
+- Help: every view has a guide (13 in all), every step's picture exists and draws at every moment of its loop in both looks; the guide follows the view (Animate tabs, Review, each puppet-studio step, Bring in…, Projects); browsing keeps a picked guide until the view changes; the help column fits between the top bar and the footer and the rest still tiles the window; Next, Back, dots and close work. Every picture checked by eye on a contact sheet (`tools/preview_help.py`).
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -158,6 +159,13 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 94. In Sketchbook, check every tab (Puppets steps, Animate › Puppet/Set/Light/Sculpt, Review & export) and the Bring in…, Projects and swap pop-ups: no text you can't read, nothing cut off with "…" that isn't in the dark look.
 95. Tell me how it feels on your screen: wobble too much or too little, text size, paper grid strength.
 
+## Help (1.3.0)
+96. Top bar › ? Help (or H, or F1): a column opens on the left with "How to…" and a guide for the view you're on. Its picture moves, smoothly, on a loop.
+97. Next / Back, the dots, the step list and clicking the picture all change step. ‹ › next to the title browse the other guides; "Back to this view's guide" returns.
+98. Change view (Animate's Set / Light / Sculpt tabs, Review & export, Puppets steps, Bring in…, Projects): the guide changes to match.
+99. Follow a guide while it's open: everything it describes is still on screen and clickable (the live view gets narrower while help is open). Esc or × closes it.
+100. Tell me which steps are unclear, and which pictures don't explain their step.
+
 ## Known gaps
 - In normal Blender the Dock still says "Blender" (the icon changes only while the Studio is open), and Blender's crash report window looks like Blender.
 - "As shot" GIFs use the shot pictures: a lighting effect added after shooting shows only in a final-render GIF (or re-shoot those shots).
@@ -169,4 +177,5 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Rigs with their own IK feet: the pin switches the rig's IK constraint; rigs that drive IK/FK with their own sliders (Rigify) keep using their sliders.
 - Knee targets come with new pins: run Make Puppet again on a puppet set up before 1.0.0 to get them.
 - Sketchbook look: a few small marks drawn in fixed colours (hover glows, some badge text) were tuned for the dark look and are faint on paper.
+- Help open: the side columns get a little narrower, so a few long header labels (Start from › "A sculpt") shorten with "…".
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.

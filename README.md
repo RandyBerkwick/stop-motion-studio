@@ -13,6 +13,8 @@ Stop Motion Studio opens as its own full-screen app: one live 3D view in the mid
 - **From Blender:** Ctrl+Alt+Shift+B (or Stop Motion › View › Open the Studio).
 - **The hidden way back:** Ctrl+Alt+Shift+B in the Studio switches to normal Blender for rigging or fixes, and back again.
 
+**Help:** ? Help in the top bar (or H, or F1) opens a "How to…" column for the view you're on: step-by-step guides with small moving pictures for animating, building a scene, bringing things in, lighting, sculpting, sharing, and building, rigging and saving puppets. `tools/preview_help.py` renders every picture to a contact sheet.
+
 **Two looks:** the dark studio, or **Sketchbook** (squared paper, hand-drawn ink outlines, a highlighter on what's picked, hand-lettered text): friendlier for kids and first-time animators. Switch with the button in the Studio's top bar; your pick is kept as a preference. Sketchbook's fonts, Patrick Hand and Kalam, ship in `stop_motion_studio/fonts` under the SIL Open Font Licence.
 
 Your normal Blender theme, preferences and keymap are never changed: the app template keeps its own settings.
@@ -93,6 +95,7 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | F6 | Ghost on / off |
 | Cmd+S / Cmd+O | Save / Projects |
 | D | Swap parts pop-up at the mouse |
+| H or F1 | Help for this view (Esc closes it) |
 | Cmd+Z | Undo |
 | Ctrl+Alt+Shift+B | Normal Blender (and back) |
 

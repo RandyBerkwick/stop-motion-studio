@@ -159,7 +159,12 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         s = 1.0
         from stop_motion_studio.studio_kit import apply_look
         apply_look(os.environ.get("SM_PREVIEW_LOOK", "DARK"))
-        L = studio_layout(W, H, s)
+        help_env = os.environ.get("SM_PREVIEW_HELP")   # e.g. "ANIMATE:1:0.4" (topic, step, moment in the loop)
+        from stop_motion_studio import studio_help
+        if help_env:
+            hk, hs, hp = (help_env.split(":") + ["0", "0.5"])[:3]
+            studio_help.H.open = True
+        L = studio_layout(W, H, s, True, bool(help_env))
         studio.S.layout = L
         kit.begin(s)
         live = L["live"]
@@ -188,6 +193,18 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         studio.draw_live_badge(kit, live, scene, s)
         if studio.S.mode == 'PUPPETS':
             studio.sp.draw_live(kit, live, ctx, s)
+        if help_env:
+            p.rect(L["help"], Theme.panel)
+            if Theme.grid is not None:
+                p.grid(L["help"], 28 * s, Theme.grid)
+            p.rect(Rect(L["help"].right - 1, L["help"].y, 1, L["help"].h), Theme.line)
+            studio_help.current(studio.S, studio.sp.P)
+            if hk != "VIEW":
+                studio_help.H.topic = hk
+            studio_help.H.step = int(hs)
+            studio_help.H.started = 1000.0
+            studio_help.draw(kit, L["help"], studio.S, studio.sp.P, s, {"close": lambda: None, "redraw": lambda: None},
+                             now=1000.0 + float(hp) * studio_help.LOOP)
         ov = os.environ.get("SM_PREVIEW_OVERLAY")
         if ov:
             studio.S.overlay = ov

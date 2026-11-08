@@ -24,6 +24,7 @@ from bpy_extras import view3d_utils
 from mathutils import Matrix, Quaternion, Vector
 
 from . import cameras, core, library, lighting, ops, props, puppet, sculpt, solid
+from . import studio_help
 from . import studio_puppets as sp
 from .studio_kit import Kit, Rect, Theme, apply_look, studio_layout
 
@@ -421,7 +422,7 @@ def draw_studio():
     except Exception as exc:
         print("Stop Motion: capture failed:", exc)
     s = scale()
-    L = studio_layout(region.width, region.height, s, S.chrome)
+    L = studio_layout(region.width, region.height, s, S.chrome, studio_help.H.open)
     S.layout = L
     kit, p, t = S.kit, S.painter, Theme
     kit.begin(s)
@@ -460,6 +461,15 @@ def draw_studio():
     draw_right(kit, L["right"], ctx, scene, s)
     draw_footer(kit, L["footer"], scene, s)
     draw_live_badge(kit, live, scene, s)
+    if L.get("help") is not None:
+        p.rect(L["help"], t.panel)
+        if t.grid is not None:
+            p.grid(L["help"], 28 * s, t.grid)
+        p.rect(Rect(L["help"].right - 1 * s, L["help"].y, 1 * s, L["help"].h), t.line)
+        try:
+            studio_help.draw(kit, L["help"], S, sp.P, s, {"close": toggle_help, "redraw": redraw})
+        except Exception as exc:
+            print("Stop Motion: help failed:", exc)
     if S.mode == 'PUPPETS':
         sp.draw_live(kit, live, ctx, s)
     if S.overlay == 'PROJECTS':
@@ -506,7 +516,8 @@ def draw_top(kit, r, scene, s):
         kit.button("mode:" + mode, cell, label, (lambda m=mode: set_mode(m)), "tab", S.mode == mode)
     # right side
     bx = r.right - 16 * s
-    for wid, label, cb, w in (("look", "Dark look" if t.sketchy else "Sketchbook", toggle_look, 116),
+    for wid, label, cb, w in (("help", "? Help", toggle_help, 80),
+                              ("look", "Dark look" if t.sketchy else "Sketchbook", toggle_look, 116),
                               ("projects", "Projects", lambda: set_overlay('PROJECTS'), 96),
                               ("save", "Save", save_project, 76),
                               ("library", "Bring in…", lambda: set_overlay('LIBRARY'), 100)):
@@ -516,6 +527,24 @@ def draw_top(kit, r, scene, s):
     name = os.path.splitext(os.path.basename(bpy.data.filepath))[0] if bpy.data.filepath else "Not saved yet"
     state = "" if not bpy.data.is_dirty else " · changes"
     kit.label(Rect(bx - 300 * s, r.y, 290 * s, r.h), name + state, 13, t.muted, "right")
+
+
+def _help_tick():
+    """Keeps the help pictures moving while the help column is open."""
+    if not (S.active and studio_help.H.open):
+        return None
+    redraw()
+    return 1 / 24
+
+
+def toggle_help():
+    if studio_help.toggle():
+        try:
+            if not bpy.app.timers.is_registered(_help_tick):
+                bpy.app.timers.register(_help_tick, first_interval=0.05)
+        except Exception:
+            pass
+    redraw()
 
 
 def toggle_look():
@@ -1522,6 +1551,12 @@ class SM_OT_studio_loop(bpy.types.Operator):
         cmd = event.ctrl or event.oskey
         if S.overlay is not None and t == 'ESC':
             S.overlay = None
+            return True
+        if t == 'ESC' and studio_help.H.open and S.chrome:
+            toggle_help()
+            return True
+        if (t == 'H' and not cmd and context.mode != 'SCULPT') or t == 'F1':
+            toggle_help()
             return True
         if t in ('RET', 'NUMPAD_ENTER'):
             shoot()
