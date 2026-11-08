@@ -80,11 +80,84 @@ def apply_keep(scene, ob, uid, keep):
     return kb
 
 
+def swap_set_of(context, ob):
+    """(puppet, set index) if `ob` is one piece of a swap set made of separate meshes (a hand shape)."""
+    for arm in puppet.puppets(context.scene):
+        for si, sset in enumerate(arm.stop_motion_puppet.swap_sets):
+            if sset.kind == 'MESH' and any(it.obj == ob for it in sset.items):
+                return arm, si
+    return None, -1
+
+
+def save_as_new_piece(context, ob, uid, part_name=""):
+    """A shot's sculpt of one swap piece (a hand, a mouth) becomes a new piece in
+    that set, and the shot uses it. Returns the new object or None."""
+    arm, si = swap_set_of(context, ob)
+    kb = sculpt_key(ob, uid, create=False)
+    if arm is None or kb is None:
+        return None
+    sset = arm.stop_motion_puppet.swap_sets[si]
+    prefix = ob.name.split("_", 1)[0]
+    if not part_name:
+        n = 1
+        while bpy.data.objects.get("%s_Shape%d" % (prefix, n)):
+            n += 1
+        part_name = "Shape%d" % n
+    clean = "".join(ch for ch in part_name.title() if ch.isalnum()) or "Shape"
+    # the sculpted shape, baked into its own mesh (no shape keys)
+    me = ob.data.copy()
+    new = ob.copy()
+    new.data = me
+    shaped = [kb.data[i].co.copy() for i in range(len(me.vertices))]
+    new.shape_key_clear()
+    for v, co in zip(me.vertices, shaped):
+        v.co = co
+    new.name = "%s_%s" % (prefix, clean)
+    new.data.name = new.name
+    if new.animation_data is not None:
+        new.animation_data_clear()
+    for col in ob.users_collection:
+        if new.name not in col.objects:
+            col.objects.link(new)
+    if ob.get("sm_face"):
+        new["sm_face"] = new.name
+        new["sm_order"] = max((o.get("sm_order", 0) for o in arm.children if o.get("sm_face", "").startswith(prefix + "_")), default=0) + 1
+    # the shot that was sculpted now shows the new piece instead of the sculpt
+    scene = context.scene
+    shots = {sh.uid: i for i, sh in enumerate(scene.stop_motion.shots)}
+    remove_sculpt(ob, uid)
+    puppet.rescan_swaps(context, arm)
+    si2 = next((i for i, st in enumerate(arm.stop_motion_puppet.swap_sets) if any(it.obj == new for it in st.items)), -1)
+    # it's new: on every other shot (and live) it stays hidden
+    others = [core.shot_start(scene, i) for u, i in shots.items() if u != uid] + [core.live_frame(scene)]
+    new.hide_viewport = new.hide_render = True
+    for f in others:
+        for path in ("hide_viewport", "hide_render"):
+            new.keyframe_insert(path, frame=f)
+    if uid in shots and si2 >= 0:
+        sset = arm.stop_motion_puppet.swap_sets[si2]
+        start = core.shot_start(scene, shots[uid])
+        keep = scene.frame_current
+        scene.frame_set(start)
+        item = next(i for i, it in enumerate(sset.items) if it.obj == new)
+        puppet.apply_swap(sset, item)
+        for it in sset.items:
+            for path in ("hide_viewport", "hide_render"):
+                it.obj.keyframe_insert(path, frame=start)
+            for fc in core.fcurves_of(it.obj):
+                for kp in fc.keyframe_points:
+                    kp.interpolation = 'CONSTANT'
+        scene.frame_set(keep)
+    return new
+
+
 def save_as_swap(context, ob, uid, set_name, part_name):
     """Turn a shot's sculpt into a swap part 'Set_Part' and refresh swap sets."""
     kb = sculpt_key(ob, uid, create=False)
     if kb is None:
         return None
+    if swap_set_of(context, ob)[0] is not None:          # a hand or mouth piece: a new piece in its set
+        return save_as_new_piece(context, ob, uid, part_name)
     clean = lambda s: "_".join(s.strip().split()) or "Part"
     kb.name = "%s_%s" % (clean(set_name), clean(part_name))
     arm = next((a for a in puppet.puppets(context.scene) if ob in puppet.puppet_meshes(a, context.scene)), None)

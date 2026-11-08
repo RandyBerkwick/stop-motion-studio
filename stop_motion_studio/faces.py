@@ -33,7 +33,7 @@ FACE_SETS = {
 }
 FACE_SETS['CHILD'] = FACE_SETS['PERSON']
 FACE_SETS['TALL'] = FACE_SETS['PERSON']
-HAND_SHAPES = ["Open", "Fist", "Point", "Grip"]
+HAND_SHAPES = ["Open", "Relaxed", "Fist", "Point", "Grip", "ThumbsUp"]
 HAND_STYLES = [("MITTEN", "Mitten", "Mitten hands"), ("FINGERS", "4 fingers", "Hands with four fingers")]
 
 
@@ -284,8 +284,12 @@ def make_hands(context, arm, style=None):
         for shape in HAND_SHAPES:
             bm = bmesh.new()
             rot = Matrix((outward, fwd, along)).transposed()
-            if shape == "Fist" or (shape == "Point"):
+            if shape in ("Fist", "Point", "ThumbsUp"):
                 assembly.blob(bm, palm_c, (pr * 0.95, pr * 0.9, pr * 1.0), rot=rot)
+            elif shape == "Relaxed":
+                assembly.blob(bm, palm_c - fwd * pr * 0.05, (pr * 0.85, pr * 0.6, pr * 1.05), rot=rot)
+                arc = [palm_c + fwd * pr * 0.25 * math.cos(a) + along * pr * (0.75 + 0.35 * math.sin(a)) for a in (-0.4, 0.5, 1.3)]
+                assembly.loft(bm, arc, [pr * 0.4] * 3, segs=10, per_span=3)
             elif shape == "Grip":
                 assembly.blob(bm, palm_c - fwd * pr * 0.1, (pr * 0.6, pr * 0.95, pr * 1.0), rot=rot)
                 arc = [palm_c + fwd * pr * 0.3 * math.cos(a) + along * pr * (0.6 + 0.5 * math.sin(a)) - outward * pr * 0.2
@@ -293,9 +297,13 @@ def make_hands(context, arm, style=None):
                 assembly.loft(bm, arc, [pr * 0.42] * 4, segs=10, per_span=3)
             else:
                 assembly.blob(bm, palm_c, (pr * 0.9, pr * 0.45, pr * 1.1), rot=rot)
-            # thumb
-            assembly.blob(bm, palm_c - fwd * pr * 0.55 - along * pr * 0.2, (pr * 0.3, pr * 0.3, pr * 0.55),
-                          rot=Matrix.Rotation(0.5 * sx, 3, along) @ rot, segs=12, rings=8)
+            # thumb (pointing up, away from the fingers, for a thumbs-up)
+            if shape == "ThumbsUp":
+                a = palm_c - fwd * pr * 0.6 - along * pr * 0.35
+                assembly.loft(bm, [a, a - along * pr * 1.1], [pr * 0.3, pr * 0.26], segs=10)
+            else:
+                assembly.blob(bm, palm_c - fwd * pr * 0.55 - along * pr * 0.2, (pr * 0.3, pr * 0.3, pr * 0.55),
+                              rot=Matrix.Rotation(0.5 * sx, 3, along) @ rot, segs=12, rings=8)
             if style == "FINGERS" and shape == "Open":
                 for k in range(4):
                     off = outward * pr * (0.6 - 0.4 * k)

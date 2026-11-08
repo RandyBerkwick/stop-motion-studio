@@ -35,6 +35,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Arranging: sliding along the floor stops at a box standing on it; moving onto the box puts it on top.
 - Torch sweep: the beam turns one way across the run and is off before and after. Painting copies: about one per spacing along a stroke. Strip: cards are as wide as their holds; clicks find the card or its edge and miss everywhere else. Saving on quit writes the project and puts Blender's prompt setting back.
 - Library pictures: made when something's added (three-quarter front view, clear background); files without one get theirs from the file, leaving nothing behind; project pictures are the last shot.
+- Hand shapes: six per hand; a hand sculpted on one shot and kept becomes a new shape in that hand's set, used by that shot only, with the one-off sculpt removed.
 - Puppet studio: a person from the kit has 8 parts (pairs for arms, legs, feet); bending parts are skinned with every point weighted, heads and feet ride their bone; feet on the floor; swapping and colouring parts; a bigger head makes a bigger head part, longer legs a taller puppet still on the floor, colours kept. Face sets (8 mouths, 5 eyes, 3 brows, both hands with 4 shapes) sit on the front of the face, eyes above the mouth, one showing, swapping works, remade when the head changes. Four legs: rings for head, body, hips, tail and four feet, all four pinned with knee targets; a person changed to four legs keeps only parts that fit. Test poses are tried and the puppet goes back to standing; a hard fold with volume keeping off is noticed; Soften joints remakes the parts softer. A sculpt made from a kit puppet: joints guessed within 2 cm; a click puts a joint in the middle of the clay and mirrors it; Make the rig gives 7 rings, 2 pins, every point weighted (separate bits like ears too), nodding moves the head and not the feet. Saved puppets come back from the library with rings, swaps and pins. The Studio's Puppets mode: steps, building, sliders applied after a pause, faces, trying, saving, a sculpt rigged. Screens rendered and checked by eye.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
@@ -148,6 +149,8 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 87. Animate a built puppet: everything from before works (shoot, swaps per shot, pins, solid world).
 88. Blender sidebar › Stop Motion › Puppet Studio does the same with plain buttons.
 89. Tell me how the kit parts and proportions feel, and which parts you'd want next.
+90. Fingers by swapping: each hand has Open, Relaxed, Fist, Point, Grip and Thumbs up; swap them shot by shot (D, or the Puppet tab).
+91. Fingers by sculpting: on a shot, click Pip's hand in the live view › Sculpt tab › Sculpt here, push the fingers into a new pose, Done. "Keep shape" on that shot's row: it becomes a new shape in that hand's set (Left hand › Shape 1), that shot uses it, other shots don't, and you can pick it on any later shot.
 
 ## Known gaps
 - In normal Blender the Dock still says "Blender" (the icon changes only while the Studio is open), and Blender's crash report window looks like Blender.
@@ -156,7 +159,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Arranging checks things standing on the surface you're sliding on; hopping onto another object doesn't check what's in between.
 - Sculpting is on the mesh at rest (the shape is added on top of the pose), so very big posed changes are easier in Blender than in Nomad.
 - Nomad remesh, Dynamic Topology or Multires change the mesh: the sculpt is then fitted to the surface (close, not exact).
-- Puppet studio: kit parts are made by code (simple clay shapes); your own parts come in through the library or a sculpt. Proportion sliders don't apply to a rigged sculpt (move its joints instead). Fingers are shaped but not posable.
+- Puppet studio: kit parts are made by code (simple clay shapes); your own parts come in through the library or a sculpt. Proportion sliders don't apply to a rigged sculpt (move its joints instead). Fingers are posed by swapping hand shapes or sculpting (no finger bones, by design).
 - Rigs with their own IK feet: the pin switches the rig's IK constraint; rigs that drive IK/FK with their own sliders (Rigify) keep using their sliders.
 - Knee targets come with new pins: run Make Puppet again on a puppet set up before 1.0.0 to get them.
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.

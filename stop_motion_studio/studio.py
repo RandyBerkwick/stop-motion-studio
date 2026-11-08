@@ -992,6 +992,7 @@ def draw_sculpt(kit, r, ctx, scene, s):
         col.note("Step back onto a shot to sculpt it.")
     else:
         col.note("Shot %d · %s" % (idx + 1, ob.name if ob else "select a mesh"))
+        col.note("Click a hand or a mouth to sculpt just that piece.")
         a, b = col.row(40).split_cols(2, 6 * s)
         kit.button("sculpthere", a, "Sculpt here", lambda: run(bpy.ops.stop_motion.sculpt_shot) or redraw(), "accent", enabled=ob is not None)
         kit.button("sendnomad", b, "Send to Nomad", lambda: run(bpy.ops.stop_motion.send_nomad) or redraw(), enabled=ob is not None)
@@ -1002,14 +1003,25 @@ def draw_sculpt(kit, r, ctx, scene, s):
                 break
             n = order.get(uid)
             col.heading("SHOT %s" % (n + 1 if n is not None else "?"))
-            a, b, c = col.row(30, 8).split_cols(3, 5 * s)
-            kit.button("sk1:" + uid, a, "Just this", (lambda u=uid: run(bpy.ops.stop_motion.sculpt_keep, obj=ob.name, uid=u, keep='ONE_OFF')), size=12)
-            kit.button("sk2:" + uid, b, "Carry on", (lambda u=uid: run(bpy.ops.stop_motion.sculpt_keep, obj=ob.name, uid=u, keep='CARRY_ON')), size=12)
-            kit.button("skx:" + uid, c, "Remove", (lambda u=uid: run(bpy.ops.stop_motion.remove_sculpt, obj=ob.name, uid=u) or redraw()), "danger", size=12)
+            piece = sculpt.swap_set_of(ctx, ob)[0] is not None
+            cells = col.row(30, 8).split_cols(4 if piece else 3, 5 * s)
+            kit.button("sk1:" + uid, cells[0], "Just this", (lambda u=uid: run(bpy.ops.stop_motion.sculpt_keep, obj=ob.name, uid=u, keep='ONE_OFF')), size=12)
+            kit.button("sk2:" + uid, cells[1], "Carry on", (lambda u=uid: run(bpy.ops.stop_motion.sculpt_keep, obj=ob.name, uid=u, keep='CARRY_ON')), size=12)
+            if piece:
+                kit.button("sks:" + uid, cells[2], "Keep shape", (lambda u=uid: keep_shape(ob, u)), "clay", size=12)
+            kit.button("skx:" + uid, cells[-1], "Remove", (lambda u=uid: run(bpy.ops.stop_motion.remove_sculpt, obj=ob.name, uid=u) or redraw()), "danger", size=12)
     for item in scene.stop_motion_nomad:
         if not col.room(30):
             break
         col.note("%s: %s" % (os.path.basename(item.path), item.status))
+
+
+def keep_shape(ob, uid):
+    """A sculpted hand (or mouth) becomes a new shape in its swap set."""
+    new = sculpt.save_as_new_piece(bpy.context, ob, uid)
+    if new is not None:
+        toast("New shape: " + new.name.replace("_", " › "))
+    redraw()
 
 
 def draw_export(kit, r, scene, s):

@@ -59,7 +59,7 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Posing over a sculpted shot keeps its sculpt.
 - Nomad bridge is a file round trip (OBJ in iCloud Drive › Stop Motion Nomad); in Nomad, import with "Keep topology" for an exact match.
 
-- Puppet studio: a parts-kit puppet skips the Joints step (the armature is the rig). Mouths are picked by hand, shot by shot (no automatic lip sync). Four-legged puppets are in from the start.
+- Puppet studio: a parts-kit puppet skips the Joints step (the armature is the rig). Mouths are picked by hand, shot by shot (no automatic lip sync). Four-legged puppets are in from the start. Fingers are posed by swapping hand shapes or by sculpting a hand on a shot (and keeping it as a new shape); no finger bones.
 
 ## Open questions
 - Which kit parts to add next (hair, hats, clothes, animal kinds)?

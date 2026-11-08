@@ -155,6 +155,7 @@ def _split(name):
 
 def _nice(s):
     s = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", s)          # LeftHand -> Left Hand, LookLeft -> Look Left
+    s = re.sub(r"(?<=[A-Za-z])(?=\d)", " ", s)           # Shape1 -> Shape 1
     s = s.replace("_", " ").replace(".", " ").replace("-", " ").strip()
     if s.isupper() and len(s) <= 4:
         return s                                          # mouth shapes: AI, MBP, FV stay as they are
