@@ -148,7 +148,202 @@ def add_to_library(context, objects, name):
         path = os.path.join(folder, "%s %d.blend" % (base, n))
         n += 1
     bpy.data.libraries.write(path, keep, fake_user=True, path_remap='ABSOLUTE')
+    render_thumbnail(sorted(keep, key=lambda o: o.name), thumb_path(path))
     return path
+
+
+# ---------------------------------------------------------------- pictures
+
+THUMB_SIZE = 320
+_THUMB_QUEUE = []          # [(blend path, item)] waiting for a picture
+_ID_KINDS = ("objects", "meshes", "materials", "armatures", "actions", "images", "collections",
+             "cameras", "lights", "curves", "node_groups", "textures", "lattices", "grease_pencils")
+
+
+def thumb_path(blend_path, item=WHOLE_FILE):
+    base = os.path.splitext(blend_path)[0]
+    if item and item != WHOLE_FILE:
+        base += " -- " + "".join(ch for ch in item if ch not in '/\\:*?"<>|')
+    return base + ".png"
+
+
+def _bounds(objects):
+    pts = []
+    for ob in objects:
+        if ob.type in {'MESH', 'CURVE', 'SURFACE', 'META', 'FONT'} and not ob.hide_render:
+            pts.extend(ob.matrix_world @ Vector(c) for c in ob.bound_box)
+    if not pts:
+        pts = [ob.matrix_world.translation for ob in objects] or [Vector()]
+    lo = Vector((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+    hi = Vector((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+    return lo, hi
+
+
+def render_thumbnail(objects, out_path, size=THUMB_SIZE):
+    """A picture of `objects` from a three-quarter front view, on a clear background."""
+    import math
+    objects = [ob for ob in objects if ob is not None]
+    if not objects:
+        return None
+    tmp = bpy.data.scenes.new("SM Thumbnail")
+    cam = None
+    try:
+        for ob in objects:
+            if ob.name not in tmp.collection.objects:
+                tmp.collection.objects.link(ob)
+        tmp.view_layers[0].update()          # where things really are (parents, rigs, constraints)
+        dg = tmp.view_layers[0].depsgraph
+        lo, hi = _bounds([ob.evaluated_get(dg) for ob in objects])
+        centre = (lo + hi) / 2
+        radius = max((hi - lo).length / 2, 0.01)
+        cam_data = bpy.data.cameras.new("SM Thumbnail")
+        cam_data.lens = 50
+        cam = bpy.data.objects.new("SM Thumbnail", cam_data)
+        tmp.collection.objects.link(cam)
+        fov = 2 * math.atan(cam_data.sensor_width / (2 * cam_data.lens))
+        d = Vector((0.45, -1.0, 0.35)).normalized()          # front is -Y
+        rot = (-d).to_track_quat('-Z', 'Y')
+        cam.rotation_euler = rot.to_euler()
+        # back off just far enough that every corner of the bounds is in frame (with a margin)
+        inv = rot.to_matrix().inverted()
+        tan = math.tan(fov / 2) * 0.86
+        need = 0.0
+        for x in (lo.x, hi.x):
+            for y in (lo.y, hi.y):
+                for z in (lo.z, hi.z):
+                    c = inv @ (Vector((x, y, z)) - centre)    # camera space: -z looks at it
+                    need = max(need, c.z + abs(c.x) / tan, c.z + abs(c.y) / tan)
+        cam.location = centre + d * max(need, radius * 0.5)
+        cam_data.clip_end = max(100.0, radius * 20)
+        tmp.camera = cam
+        r = tmp.render
+        r.engine = 'BLENDER_WORKBENCH'
+        r.resolution_x = r.resolution_y = size
+        r.resolution_percentage = 100
+        r.film_transparent = True
+        r.image_settings.file_format = 'PNG'
+        r.image_settings.color_mode = 'RGBA'
+        r.filepath = out_path
+        tmp.view_settings.exposure = 0.6
+        sh = tmp.display.shading
+        sh.light = 'STUDIO'
+        sh.color_type = 'MATERIAL'
+        sh.show_shadows = True
+        sh.show_cavity = True
+        bpy.ops.render.render(write_still=True, scene=tmp.name)
+    except Exception as exc:
+        print("Stop Motion: couldn't make a picture:", exc)
+        return None
+    finally:
+        if cam is not None:
+            data = cam.data
+            bpy.data.objects.remove(cam)
+            bpy.data.cameras.remove(data)
+        bpy.data.scenes.remove(tmp)
+    _forget_image(out_path)
+    return out_path if os.path.exists(out_path) else None
+
+
+def make_file_thumbnail(path, item=WHOLE_FILE):
+    """Load an item from a library file just long enough to take its picture."""
+    before = {k: set(getattr(bpy.data, k)) for k in _ID_KINDS if hasattr(bpy.data, k)}
+    out = None
+    try:
+        with bpy.data.libraries.load(path, link=False) as (src, dst):
+            if item == WHOLE_FILE:
+                dst.objects = list(src.objects)
+            else:
+                dst.collections = [item]
+        obs = [o for o in dst.objects if o is not None] if item == WHOLE_FILE else \
+            [o for c in dst.collections if c is not None for o in c.all_objects]
+        out = render_thumbnail(obs, thumb_path(path, item))
+    except (OSError, RuntimeError) as exc:
+        print("Stop Motion: couldn't read %s: %s" % (path, exc))
+    finally:
+        new = []
+        for k, old in before.items():
+            new.extend(i for i in getattr(bpy.data, k) if i not in old)
+        if new:
+            bpy.data.batch_remove(new)
+    return out
+
+
+def missing_thumbnails(folder=None):
+    folder = folder or library_dir()
+    out = []
+    for f in list_files(folder):
+        path = os.path.join(folder, f)
+        for name, _label in contents(path):
+            tp = thumb_path(path, name)
+            if not os.path.exists(tp) or os.path.getmtime(tp) < os.path.getmtime(path):
+                out.append((path, name))
+    return out
+
+
+def queue_thumbnails(items):
+    for it in items:
+        if it not in _THUMB_QUEUE:
+            _THUMB_QUEUE.append(it)
+    if _THUMB_QUEUE and not bpy.app.timers.is_registered(_thumb_tick):
+        bpy.app.timers.register(_thumb_tick, first_interval=0.2)
+
+
+def _thumb_tick():
+    """One picture at a time, so the Studio stays responsive."""
+    if not _THUMB_QUEUE:
+        return None
+    path, item = _THUMB_QUEUE.pop(0)
+    if os.path.exists(path):
+        make_file_thumbnail(path, item)
+    try:
+        from . import studio
+        studio.redraw()
+    except Exception:
+        pass
+    return 0.05 if _THUMB_QUEUE else None
+
+
+def _image_name(png):
+    return "SM thumb " + str(abs(hash(png)))
+
+
+def _forget_image(png):
+    img = bpy.data.images.get(_image_name(png))
+    if img is not None:
+        bpy.data.images.remove(img)
+
+
+def thumb_image(png):
+    """The picture as a Blender image (reloaded when the file changes), or None."""
+    if not os.path.exists(png):
+        return None
+    name = _image_name(png)
+    img = bpy.data.images.get(name)
+    m = os.path.getmtime(png)
+    if img is not None and img.get("sm_mtime") != m:
+        bpy.data.images.remove(img)
+        img = None
+    if img is None:
+        try:
+            img = bpy.data.images.load(png, check_existing=False)
+        except RuntimeError:
+            return None
+        img.name = name
+        img["sm_mtime"] = m
+    return img
+
+
+class SM_OT_make_thumbnails(bpy.types.Operator):
+    """Take a picture of everything in the library that doesn't have one yet"""
+    bl_idname = "stop_motion.make_thumbnails"
+    bl_label = "Make Library Pictures"
+
+    def execute(self, context):
+        todo = missing_thumbnails()
+        for path, item in todo:
+            make_file_thumbnail(path, item)
+        self.report({'INFO'}, "%d picture%s made" % (len(todo), "" if len(todo) == 1 else "s"))
+        return {'FINISHED'}
 
 
 class SM_OT_bring_in(bpy.types.Operator):
@@ -215,7 +410,7 @@ class SM_OT_open_library(bpy.types.Operator):
         return {'FINISHED'}
 
 
-classes = (SM_OT_bring_in, SM_OT_add_to_library, SM_OT_open_library)
+classes = (SM_OT_bring_in, SM_OT_add_to_library, SM_OT_open_library, SM_OT_make_thumbnails)
 
 
 def register():

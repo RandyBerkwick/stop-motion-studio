@@ -1174,23 +1174,6 @@ def draw_live_badge(kit, live, scene, s):
         pass
 
 
-def draw_projects(kit, full, s):
-    t = Theme
-    kit.area("overlay:shade", full, on_click=lambda: set_overlay('PROJECTS'))
-    kit.p.rect(full, (0, 0, 0, 0.55))
-    box = Rect(full.cx - 260 * s, full.cy - 220 * s, 520 * s, 440 * s)
-    kit.area("overlay:box", box)
-    kit.panel(box, t.panel, 14, t.line_strong)
-    col = Column(kit, box.inset(24 * s, 20 * s), s)
-    col.title("Projects")
-    col.note(PROJECTS_DIR)
-    kit.button("proj:new", col.row(38), "New project", new_project, "accent")
-    for name in list_projects()[:8]:
-        kit.button("proj:" + name, col.row(34, 5), os.path.splitext(name)[0], (lambda n=name: open_project(n)))
-    if not list_projects():
-        col.note("Nothing saved yet. Save puts projects here.")
-
-
 def lib_items(path):
     try:
         m = os.path.getmtime(path)
@@ -1226,60 +1209,85 @@ def add_selection_to_library():
     redraw()
 
 
+def lib_all_items():
+    """[(path, item, label)] across the library."""
+    out = []
+    for f in library.list_files():
+        path = os.path.join(library.LIBRARY_DIR, f)
+        for name, label in lib_items(path):
+            out.append((path, name, label))
+    return out
+
+
+def draw_picture_card(kit, r, png, label, s, on_click=None, wid=None, missing="Making a picture…"):
+    """A card with a picture and a name. Returns the area under the picture for buttons."""
+    t = Theme
+    p = kit.p
+    kit.panel(r, t.raised, 10)
+    ph = (r.w - 12 * s) * 0.72
+    pic = Rect(r.x + 6 * s, r.top - 6 * s - ph, r.w - 12 * s, ph)
+    p.rect(pic, (0.36, 0.33, 0.30, 1.0), 6 * s)     # a light backdrop, so clay reads
+    img = library.thumb_image(png) if png else None
+    if img is not None:
+        w, h = img.size
+        p.image(pic.inset(4 * s).fit_aspect(w / max(1, h)), img)
+    else:
+        kit.label(pic, missing, 11, t.muted, "center")
+    kit.label(Rect(r.x + 8 * s, pic.y - 24 * s, r.w - 16 * s, 20 * s), label, 13, t.text, "left", True)
+    if on_click is not None:
+        kit.area(wid or ("card:" + label), pic, on_click=on_click)
+    return Rect(r.x + 6 * s, r.y + 6 * s, r.w - 12 * s, pic.y - 30 * s - r.y - 6 * s)
+
+
 def draw_library(kit, full, ctx, s):
     t = Theme
     kit.area("overlay:shade", full, on_click=lambda: set_overlay('LIBRARY'))
     kit.p.rect(full, (0, 0, 0, 0.55))
-    box = Rect(full.cx - 360 * s, full.cy - 250 * s, 720 * s, 500 * s)
+    box = Rect(full.cx - 440 * s, full.cy - 300 * s, 880 * s, 600 * s)
     kit.area("overlay:box", box)
     kit.panel(box, t.panel, 14, t.line_strong)
     inner = box.inset(24 * s, 20 * s)
     head, body = inner.take_top(64 * s)
     kit.label(Rect(head.x, head.top - 26 * s, head.w, 26 * s), "Bring in a puppet, prop or set piece", 16, t.text, "left", True)
     kit.label(Rect(head.x, head.top - 50 * s, head.w, 18 * s), library.LIBRARY_DIR, 11, t.muted)
-    files = library.list_files()
-    left = Rect(body.x, body.y + 52 * s, body.w * 0.42, body.h - 52 * s)
-    right = Rect(left.right + 16 * s, body.y + 52 * s, body.right - left.right - 16 * s, body.h - 52 * s)
-    col = Column(kit, left, s)
-    col.heading("FILES")
-    if not files:
-        col.note("The library is empty.")
-        col.note("Put .blend files of puppets, props and sets")
-        col.note("in the folder, or add what's selected.")
-    for f in files:
-        if not col.room(36):
-            col.note("…more in the folder")
-            break
-        kit.button("lib:" + f, col.row(32, 5), os.path.splitext(f)[0],
-                   (lambda n=f: setattr(S, "lib_file", n) or redraw()), "tab", S.lib_file == f, size=12)
-    col = Column(kit, right, s)
-    if S.lib_file and S.lib_file in files:
-        path = os.path.join(library.LIBRARY_DIR, S.lib_file)
-        items = lib_items(path)
-        col.heading("IN THIS FILE")
-        if not items:
-            col.note("Nothing to bring in from this file.")
-        for name, label in items:
-            if not col.room(44):
-                break
-            row = col.row(34, 6)
-            name_r = Rect(row.x, row.y, row.w - 228 * s, row.h)
-            kit.label(name_r, label, 13, t.text)
-            for k, (kind, text) in enumerate((('PUPPET', "Puppet"), ('PROP', "Prop"), ('SET', "Set"))):
-                b = Rect(row.right - (3 - k) * 76 * s, row.y, 72 * s, row.h)
-                kit.button("bring:%s:%s:%s" % (S.lib_file, name, kind), b, text,
-                           (lambda pth=path, nm=name, kd=kind: bring_in(pth, nm, kd)),
-                           "accent" if kind == 'PUPPET' else "ghost", size=12)
-        col.note("Puppet: a rig, set up with grab rings. Prop: can be moved and held.")
-        col.note("Set: stays put in every shot.")
-    else:
-        col.heading("PICK A FILE")
-        col.note("Its puppets and props are listed here.")
-    foot = Rect(body.x, body.y, body.w, 40 * s)
-    a, b = foot.split_cols(2, 10 * s)
-    kit.button("lib:add", a, "Add what's selected to the library", add_selection_to_library, size=12,
-               enabled=bool(ctx.selected_objects))
-    kit.button("lib:open", b, "Show the library folder", lambda: run(bpy.ops.stop_motion.open_library), size=12)
+    bx = head.right
+    for wid, label, cb, w in (("lib:open", "Show the folder", lambda: run(bpy.ops.stop_motion.open_library), 140),
+                              ("lib:add", "Add what's selected", add_selection_to_library, 170)):
+        bx -= w * s
+        kit.button(wid, Rect(bx, head.top - 40 * s, w * s, 34 * s), label, cb, size=12,
+                   enabled=(wid != "lib:add" or bool(ctx.selected_objects)))
+        bx -= 8 * s
+    items = lib_all_items()
+    if not items:
+        col = Column(kit, body, s)
+        col.title("The library is empty")
+        col.note("Put .blend files of puppets, props and sets in the folder,")
+        col.note("or select something in the live view and press \"Add what's selected\".")
+        return
+    want = [(pth, nm) for pth, nm, _l in items if not os.path.exists(library.thumb_path(pth, nm))]
+    if want:
+        library.queue_thumbnails(want)
+    card_w, card_h, gap = 196 * s, 232 * s, 12 * s
+    cols = max(1, int((body.w + gap) // (card_w + gap)))
+    rows = (len(items) + cols - 1) // cols
+    total_h = rows * (card_h + gap)
+    off = kit.scroll.get("lib", 0.0)
+    off = max(0.0, min(off, max(0.0, total_h - body.h)))
+    kit.scroll["lib"] = off
+    kit.area("lib:grid", body, on_wheel=lambda st: kit.scroll.__setitem__("lib", kit.scroll.get("lib", 0) - st * 80 * s) or redraw())
+    kit.p.clip(body)
+    for n, (path, name, label) in enumerate(items):
+        row, c = divmod(n, cols)
+        r = Rect(body.x + c * (card_w + gap), body.top - (row + 1) * (card_h + gap) + gap + off, card_w, card_h)
+        if r.top < body.y or r.y > body.top:
+            continue
+        under = draw_picture_card(kit, r, library.thumb_path(path, name), label, s)
+        cells = Rect(under.x, under.y, under.w, 30 * s).split_cols(3, 4 * s)
+        for (kind, text), cell in zip((('PUPPET', "Puppet"), ('PROP', "Prop"), ('SET', "Set")), cells):
+            kit.button("bring:%s:%s:%s" % (path, name, kind), cell, text,
+                       (lambda pth=path, nm=name, kd=kind: bring_in(pth, nm, kd)),
+                       "accent" if kind == 'PUPPET' else "ghost", size=11)
+    kit.p.unclip()
 
 
 def draw_swap_popup(kit, full, ctx, s):
@@ -1313,6 +1321,59 @@ def draw_swap_popup(kit, full, ctx, s):
                 kit.button("pswap:%d:%d" % (si, ii), cell, it.label,
                            (lambda a=si, b=ii: run(bpy.ops.stop_motion.swap, puppet=arm.name, set_index=a, item=b) or redraw()),
                            "clay", selected=(ii == active), size=12)
+
+
+def project_picture(name):
+    """Each project in ~/Stop Motion keeps a picture of its last shot next to it."""
+    png = os.path.join(PROJECTS_DIR, os.path.splitext(name)[0] + ".png")
+    return png if os.path.exists(png) else None
+
+
+@persistent
+def _on_save(_dummy=None):
+    """Saving a project in ~/Stop Motion: keep its last shot as its picture."""
+    try:
+        path = bpy.data.filepath
+        if not path or os.path.dirname(os.path.abspath(path)) != os.path.abspath(PROJECTS_DIR):
+            return
+        scene = bpy.context.scene
+        shots = scene.stop_motion.shots
+        if not len(shots):
+            return
+        src = core.capture_path(scene, shots[len(shots) - 1].uid)
+        if os.path.exists(src):
+            import shutil
+            shutil.copyfile(src, os.path.splitext(path)[0] + ".png")
+    except Exception as exc:
+        print("Stop Motion: couldn't keep the project picture:", exc)
+
+
+def draw_projects(kit, full, s):
+    t = Theme
+    kit.area("overlay:shade", full, on_click=lambda: set_overlay('PROJECTS'))
+    kit.p.rect(full, (0, 0, 0, 0.55))
+    box = Rect(full.cx - 440 * s, full.cy - 300 * s, 880 * s, 600 * s)
+    kit.area("overlay:box", box)
+    kit.panel(box, t.panel, 14, t.line_strong)
+    inner = box.inset(24 * s, 20 * s)
+    head, body = inner.take_top(64 * s)
+    kit.label(Rect(head.x, head.top - 26 * s, head.w, 26 * s), "Projects", 16, t.text, "left", True)
+    kit.label(Rect(head.x, head.top - 50 * s, head.w, 18 * s), PROJECTS_DIR, 11, t.muted)
+    kit.button("proj:new", Rect(head.right - 150 * s, head.top - 40 * s, 150 * s, 34 * s), "New project", new_project, "accent")
+    names = list_projects()
+    if not names:
+        Column(kit, body, s).note("Nothing saved yet. Save puts projects here.")
+        return
+    card_w, card_h, gap = 196 * s, 196 * s, 12 * s
+    cols = max(1, int((body.w + gap) // (card_w + gap)))
+    for n, name in enumerate(names[:cols * 2]):
+        row, c = divmod(n, cols)
+        r = Rect(body.x + c * (card_w + gap), body.top - (row + 1) * (card_h + gap) + gap, card_w, card_h)
+        draw_picture_card(kit, r, project_picture(name), os.path.splitext(name)[0], s,
+                          on_click=(lambda nm=name: open_project(nm)), wid="proj:" + name, missing="No shots yet")
+        kit.area("projcard:" + name, r, on_click=(lambda nm=name: open_project(nm)))
+    if len(names) > cols * 2:
+        kit.label(Rect(body.x, body.y, body.w, 18 * s), "%d more in the folder" % (len(names) - cols * 2), 11, t.muted)
 
 
 # ================================================================ studio input
@@ -1620,6 +1681,7 @@ def register():
     _handle = bpy.types.SpaceView3D.draw_handler_add(draw_studio, (), 'WINDOW', 'POST_PIXEL')
     bpy.app.handlers.load_post.append(_on_load)
     bpy.app.handlers.exit_pre.append(_on_exit)
+    bpy.app.handlers.save_post.append(_on_save)
     kc = bpy.context.window_manager.keyconfigs.addon
     if kc is not None:
         km = kc.keymaps.new(name="Window", space_type='EMPTY')
@@ -1636,6 +1698,8 @@ def unregister():
         bpy.app.handlers.load_post.remove(_on_load)
     if _on_exit in bpy.app.handlers.exit_pre:
         bpy.app.handlers.exit_pre.remove(_on_exit)
+    if _on_save in bpy.app.handlers.save_post:
+        bpy.app.handlers.save_post.remove(_on_save)
     _restore_prompt()
     if _handle is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_handle, 'WINDOW')

@@ -43,6 +43,25 @@ for c, size in ((c1, 1.0), (c2, 0.2)):
 bpy.data.libraries.write(coll_file, {c1, c2}, fake_user=True)
 assert sorted(library.contents(coll_file)) == [("Bush", "Bush"), ("Flower", "Flower")]
 
+# --- pictures: made when added; made from the file when missing; nothing left behind
+import numpy as np
+for f in ("Bramble", "Bramble ready", "Mug"):
+    assert os.path.exists(os.path.join(lib, f + ".png")), f
+img = library.thumb_image(os.path.join(lib, "Bramble.png"))
+assert img is not None and img.size[0] == library.THUMB_SIZE
+px = np.empty(img.size[0] * img.size[1] * 4, np.float32); img.pixels.foreach_get(px)
+alpha = px[3::4]
+assert 0.08 < (alpha > 0.5).mean() < 0.7, "Bramble fills a good part of the picture, on a clear background"
+missing = library.missing_thumbnails()
+print("missing pictures", [(os.path.basename(p), i) for p, i in missing])
+assert sorted(i for _p, i in missing) == ["Bush", "Flower"]
+n_objects, n_meshes = len(bpy.data.objects), len(bpy.data.meshes)
+assert bpy.ops.stop_motion.make_thumbnails() == {'FINISHED'}
+assert os.path.exists(library.thumb_path(coll_file, "Bush")) and os.path.exists(library.thumb_path(coll_file, "Flower"))
+assert (len(bpy.data.objects), len(bpy.data.meshes)) == (n_objects, n_meshes), "nothing left behind"
+assert library.missing_thumbnails() == []
+print("pictures ok")
+
 # --- a fresh stage: floor + camera looking at the middle
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sms.unregister(); sms.register()

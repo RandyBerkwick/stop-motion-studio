@@ -443,6 +443,23 @@ class SM_PT_review(bpy.types.Panel):
         op.kind = 'BLEND'
 
 
+_previews = None
+
+
+def _preview_icon(png):
+    """An icon id for a picture file (Blender's preview cache)."""
+    global _previews
+    if not os.path.exists(png):
+        return 0
+    from bpy.utils import previews
+    if _previews is None:
+        _previews = previews.new()
+    key = "%s|%s" % (png, os.path.getmtime(png))
+    if key not in _previews:
+        _previews.load(key, png, 'IMAGE')
+    return _previews[key].icon_id
+
+
 class SM_PT_library(bpy.types.Panel):
     bl_label = "Library"
     bl_space_type = 'VIEW_3D'
@@ -457,15 +474,24 @@ class SM_PT_library(bpy.types.Panel):
         files = library.list_files()
         if not files:
             layout.label(text="Empty: add .blend files to the folder", icon='INFO')
+        grid = layout.grid_flow(row_major=True, columns=2, even_columns=True, align=False)
+        missing = False
         for f in files:
-            box = layout.box()
-            box.label(text=f[:-6], icon='FILE_BLEND')
-            for name, label in library.contents(os.path.join(library.LIBRARY_DIR, f)):
+            path = os.path.join(library.LIBRARY_DIR, f)
+            for name, label in library.contents(path):
+                box = grid.box()
+                icon = _preview_icon(library.thumb_path(path, name))
+                if icon:
+                    box.template_icon(icon_value=icon, scale=5.0)
+                else:
+                    missing = True
+                box.label(text=label)
                 row = box.row(align=True)
-                row.label(text=label)
                 for kind, text in (('PUPPET', "Puppet"), ('PROP', "Prop"), ('SET', "Set")):
                     op = row.operator("stop_motion.bring_in", text=text)
                     op.path, op.item, op.kind = f, name, kind
+        if missing:
+            layout.operator("stop_motion.make_thumbnails", icon='IMAGE_DATA')
         row = layout.row(align=True)
         row.operator("stop_motion.add_to_library", icon='ADD')
         row.operator("stop_motion.open_library", text="", icon='FILE_FOLDER')
@@ -578,7 +604,11 @@ def register():
 
 
 def unregister():
-    global _hud
+    global _hud, _previews
+    if _previews is not None:
+        from bpy.utils import previews
+        previews.remove(_previews)
+        _previews = None
     for km, kmi in _keymaps:
         km.keymap_items.remove(kmi)
     _keymaps.clear()

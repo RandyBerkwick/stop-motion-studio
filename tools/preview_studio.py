@@ -145,6 +145,10 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
                 studio.draw_library(kit, L["full"], ctx, s)
             elif ov == 'SWAPS':
                 studio.draw_swap_popup(kit, L["full"], ctx, s)
+            elif ov == 'PROJECTS':
+                if os.environ.get("SM_PREVIEW_PROJECTS"):
+                    studio.PROJECTS_DIR = os.environ["SM_PREVIEW_PROJECTS"]
+                studio.draw_projects(kit, L["full"], s)
         buf = fb.read_color(0, 0, W, H, 4, 0, 'FLOAT')
     import numpy as np
     try:
