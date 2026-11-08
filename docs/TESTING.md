@@ -143,6 +143,6 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Arranging checks things standing on the surface you're sliding on; hopping onto another object doesn't check what's in between.
 - Sculpting is on the mesh at rest (the shape is added on top of the pose), so very big posed changes are easier in Blender than in Nomad.
 - Nomad remesh, Dynamic Topology or Multires change the mesh: the sculpt is then fitted to the surface (close, not exact).
-- Rigs that already have IK foot controls (e.g. Rigify) get rings on those controls and no extra pins.
-- Pins can flip a knee the wrong way on extreme poses (no knee direction target yet).
+- Rigs with their own IK feet: the pin switches the rig's IK constraint; rigs that drive IK/FK with their own sliders (Rigify) keep using their sliders.
+- Knee targets come with new pins: run Make Puppet again on a puppet set up before 1.0.0 to get them.
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.
