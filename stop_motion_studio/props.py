@@ -95,7 +95,49 @@ class SM_Settings(bpy.types.PropertyGroup):
                              description="A puppet's hand stops at its own body, its feet at each other")
 
 
-classes = (SM_Shot, SM_Settings)
+LOOK_ITEMS = [('DARK', "Dark studio", "The original dark Studio"),
+              ('SKETCH', "Sketchbook", "Squared paper, ink outlines and hand-lettering: friendly for first-time animators")]
+_look_fallback = ['DARK']
+
+
+def _redraw_all(self=None, context=None):
+    try:
+        for win in bpy.context.window_manager.windows:
+            for area in win.screen.areas:
+                area.tag_redraw()
+    except Exception:
+        pass
+
+
+class SM_Preferences(bpy.types.AddonPreferences):
+    bl_idname = __package__
+
+    look: EnumProperty(name="Studio look", items=LOOK_ITEMS, default='DARK', update=_redraw_all,
+                       description="How the Studio screen looks. You can also switch it from the Studio's top bar")
+
+    def draw(self, context):
+        self.layout.prop(self, "look", expand=True)
+
+
+def get_look():
+    try:
+        return bpy.context.preferences.addons[__package__].preferences.look
+    except Exception:
+        return _look_fallback[0]
+
+
+def set_look(name):
+    _look_fallback[0] = name
+    try:
+        prefs = bpy.context.preferences
+        prefs.addons[__package__].preferences.look = name
+        prefs.is_dirty = True   # Blender saves preferences on quit when auto-save is on
+    except Exception:
+        pass
+    _redraw_all()
+
+
+classes = (SM_Shot, SM_Settings, SM_Preferences)
 
 
 def register():

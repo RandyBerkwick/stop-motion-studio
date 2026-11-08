@@ -152,6 +152,12 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 90. Fingers by swapping: each hand has Open, Relaxed, Fist, Point, Grip and Thumbs up; swap them shot by shot (D, or the Puppet tab).
 91. Fingers by sculpting: on a shot, click Pip's hand in the live view › Sculpt tab › Sculpt here, push the fingers into a new pose, Done. "Keep shape" on that shot's row: it becomes a new shape in that hand's set (Left hand › Shape 1), that shot uses it, other shots don't, and you can pick it on any later shot.
 
+## Sketchbook look (1.2.0)
+92. Studio top bar › Sketchbook: the Studio turns into squared paper with ink-outlined, slightly wobbly buttons, a little shadow under each, hand-lettered text, and a yellow highlighter on whatever is picked. The button now says "Dark look" and switches back.
+93. Quit and reopen Blender: the look you picked is kept (it's in Edit › Preferences › Add-ons › Stop Motion Studio, too).
+94. In Sketchbook, check every tab (Puppets steps, Animate › Puppet/Set/Light/Sculpt, Review & export) and the Bring in…, Projects and swap pop-ups: no text you can't read, nothing cut off with "…" that isn't in the dark look.
+95. Tell me how it feels on your screen: wobble too much or too little, text size, paper grid strength.
+
 ## Known gaps
 - In normal Blender the Dock still says "Blender" (the icon changes only while the Studio is open), and Blender's crash report window looks like Blender.
 - "As shot" GIFs use the shot pictures: a lighting effect added after shooting shows only in a final-render GIF (or re-shoot those shots).
@@ -162,4 +168,5 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Puppet studio: kit parts are made by code (simple clay shapes); your own parts come in through the library or a sculpt. Proportion sliders don't apply to a rigged sculpt (move its joints instead). Fingers are posed by swapping hand shapes or sculpting (no finger bones, by design).
 - Rigs with their own IK feet: the pin switches the rig's IK constraint; rigs that drive IK/FK with their own sliders (Rigify) keep using their sliders.
 - Knee targets come with new pins: run Make Puppet again on a puppet set up before 1.0.0 to get them.
+- Sketchbook look: a few small marks drawn in fixed colours (hover glows, some badge text) were tuned for the dark look and are faint on paper.
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.

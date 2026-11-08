@@ -157,6 +157,8 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         gpu.matrix.load_matrix(Matrix.Identity(4))
         gpu.matrix.load_projection_matrix(Matrix(((2 / W, 0, 0, -1), (0, 2 / H, 0, -1), (0, 0, -1, 0), (0, 0, 0, 1))))
         s = 1.0
+        from stop_motion_studio.studio_kit import apply_look
+        apply_look(os.environ.get("SM_PREVIEW_LOOK", "DARK"))
         L = studio_layout(W, H, s)
         studio.S.layout = L
         kit.begin(s)
@@ -171,6 +173,8 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         p.rect_outline(border, Theme.accent, 0, 2)
         for key in ("top", "head_left", "head_centre", "head_right", "left", "right", "footer"):
             p.rect(L[key], Theme.ground if key in ("left", "right") else Theme.panel)
+            if Theme.grid is not None and key in ("left", "right"):
+                p.grid(L[key], 28 * s, Theme.grid)
         p.rect(Rect(L["top"].x, L["top"].y, L["top"].w, 1), Theme.line)
         p.rect(Rect(L["footer"].x, L["footer"].top - 1, L["footer"].w, 1), Theme.line)
         for key in ("head_left", "head_centre", "head_right"):

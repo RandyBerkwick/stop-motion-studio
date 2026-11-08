@@ -13,9 +13,11 @@ Stop Motion Studio opens as its own full-screen app: one live 3D view in the mid
 - **From Blender:** Ctrl+Alt+Shift+B (or Stop Motion › View › Open the Studio).
 - **The hidden way back:** Ctrl+Alt+Shift+B in the Studio switches to normal Blender for rigging or fixes, and back again.
 
+**Two looks:** the dark studio, or **Sketchbook** (squared paper, hand-drawn ink outlines, a highlighter on what's picked, hand-lettered text): friendlier for kids and first-time animators. Switch with the button in the Studio's top bar; your pick is kept as a preference. Sketchbook's fonts, Patrick Hand and Kalam, ship in `stop_motion_studio/fonts` under the SIL Open Font Licence.
+
 Your normal Blender theme, preferences and keymap are never changed: the app template keeps its own settings.
 
-`tools/preview_studio.py` renders the Studio off-screen to a PNG (software GPU), for checking the interface without a window.
+`tools/preview_studio.py` renders the Studio off-screen to a PNG (software GPU), for checking the interface without a window. Set `SM_PREVIEW_LOOK=SKETCH` for the Sketchbook look.
 
 While the Studio is open, quitting saves your work instead of showing Blender's "save changes?" box (a project that was never saved goes into ~/Stop Motion). On a Mac the Dock shows the Studio's icon.
 
@@ -124,3 +126,4 @@ Drag the right edge of a card in the shot strip to hold that shot longer or shor
 
 ## Licence
 GPL-3.0-or-later (required for Blender add-ons that use its Python API).
+The Sketchbook fonts in `stop_motion_studio/fonts` are under the SIL Open Font Licence 1.1 (licence files alongside).

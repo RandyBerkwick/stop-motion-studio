@@ -17,7 +17,28 @@ def hexc(h, a=1.0):
     return (int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255, a)
 
 
+LOOKS = {
+    # the original dark studio
+    "DARK": dict(
+        ground="1c1916", panel="26221e", raised="332e28", line="3a342d", line_strong="4a4239",
+        text="f1ebe3", soft="d8cfc4", muted="a89e92", accent="ff6a3d", on_accent="1a0e08",
+        blue="7cc4ff", yellow="f5c84c", green="9ed98c", danger="e2553f", clay="f3e6cf",
+        clay_text="3a2618", stage="0e0c0a", mark="f5c84c", on_yellow="1c1916", grid=None, shadow=None, sketchy=False),
+    # a notebook: squared paper, ink outlines, highlighter for what is picked
+    "SKETCH": dict(
+        ground="f7f3ea", panel="fffdf7", raised="f1ebdd", line="d9d1c0", line_strong="3a3a3a",
+        text="262626", soft="3d3a35", muted="6b665e", accent="d2462a", on_accent="ffffff",
+        blue="2f6db5", yellow="fff176", green="3b8f4f", danger="c0392b", clay="fffdf7",
+        clay_text="262626", stage="e9e3d6", mark="a66a00", on_yellow="262626", grid="e6e0d1", shadow="262626", sketchy=True),
+}
+LOOK_NAMES = (("DARK", "Dark studio"), ("SKETCH", "Sketchbook"))
+
+
 class Theme:
+    look = "DARK"
+    sketchy = False
+    grid = None
+    shadow = None
     ground = hexc("1c1916")
     panel = hexc("26221e")
     raised = hexc("332e28")
@@ -35,6 +56,20 @@ class Theme:
     clay = hexc("f3e6cf")
     clay_text = hexc("3a2618")
     stage = hexc("0e0c0a")
+    mark = hexc("f5c84c")       # yellow when it is text or a thin mark on the background
+    on_yellow = hexc("1c1916")  # text on a yellow tag
+
+
+def apply_look(name):
+    """Switch every colour the Studio draws with. Returns True if it changed."""
+    if name not in LOOKS:
+        name = "DARK"
+    if Theme.look == name:
+        return False
+    for k, v in LOOKS[name].items():
+        setattr(Theme, k, hexc(v) if isinstance(v, str) else v)
+    Theme.look = name
+    return True
 
 
 # ------------------------------------------------------------------ rects
@@ -150,6 +185,8 @@ class Kit:
 
     # ---- painting helpers
     def panel(self, rect, color=None, radius=0, border=None):
+        if self.t.sketchy and border and radius:
+            self.p.rect(Rect(rect.x + 3 * self.s, rect.y - 4 * self.s, rect.w, rect.h), self.t.shadow[:3] + (0.85,), radius * self.s)
         self.p.rect(rect, color or self.t.panel, radius * self.s)
         if border:
             self.p.rect_outline(rect, border, radius * self.s, 1)
@@ -157,7 +194,12 @@ class Kit:
     def label(self, rect, text, size=13, color=None, align="left", bold=False):
         self.p.text(rect, text, size * self.s, color or self.t.text, align, bold)
 
-    def text_width(self, text, size=13):
+    def text_width(self, text, size=13, bold=False):
+        if self.t.sketchy:   # measure at the wider hand-lettered bold, so a box fits either weight
+            try:
+                return self.p.text_width(text, size * self.s, bold=True)
+            except TypeError:
+                pass
         return self.p.text_width(text, size * self.s)
 
     # ---- widgets
@@ -166,6 +208,8 @@ class Kit:
         hov, prs = self._hit(wid, rect, "button", on_click=on_click if enabled else None)
         t = self.t
         r = 9 * self.s
+        if t.sketchy:
+            return self._sketch_button(rect, label, style, selected, enabled, size, icon, hov, prs)
         if style == "accent":
             bg, fg, br = t.accent, t.on_accent, None
             if hov:
@@ -207,6 +251,50 @@ class Kit:
             self.p.text(rect, label, size * self.s, fg, "center", style == "accent" or selected)
         return hov
 
+    def _sketch_button(self, rect, label, style, selected, enabled, size, icon, hov, prs):
+        """Sketchbook buttons: ink outline, a little offset shadow, highlighter when picked."""
+        t, s = self.t, self.s
+        r = 9 * s
+        ink = t.line_strong
+        shadow = True
+        if style == "accent":
+            bg, fg, br = t.accent, t.on_accent, ink
+        elif style == "tab":
+            bg = t.yellow if selected else ((0, 0, 0, 0.05) if hov else (0, 0, 0, 0))
+            fg = t.text if selected or hov else t.muted
+            br = ink if selected else None
+            shadow = selected
+        elif style == "danger":
+            bg, fg, br = t.panel, t.danger, t.danger
+        elif style == "clay":
+            bg, fg, br = (t.yellow if selected else t.panel), t.text, ink
+        else:
+            bg = t.yellow if selected else (t.raised if hov else t.panel)
+            fg, br = t.text, ink
+        if not enabled:
+            fg = t.muted[:3] + (0.6,)
+            shadow = False
+        d = rect
+        if prs and enabled:   # pressed: the button sits down onto its shadow
+            d = Rect(rect.x + 2 * s, rect.y - 2 * s, rect.w, rect.h)
+        elif shadow:
+            self.p.rect(Rect(rect.x + 2 * s, rect.y - 3 * s, rect.w, rect.h), t.shadow[:3] + (0.9,), r)
+        self.p.rect(d, bg, r)
+        if br is not None:
+            self.p.rect_outline(d, br, r, 2 * s if s >= 1 else 1.5)
+        bold = style in ("accent", "tab")   # picked buttons already wear the highlighter
+        if icon:
+            iw = 14 * s
+            tw = self.text_width(label, size, bold) if label else 0
+            gap = 7 * s if label else 0
+            x0 = d.cx - (iw + gap + tw) / 2
+            self.p.icon(icon, Rect(x0, d.cy - iw / 2, iw, iw), fg)
+            if label:
+                self.p.text(Rect(x0 + iw + gap, d.y, tw + 4, d.h), label, size * s, fg, "left", bold)
+        else:
+            self.p.text(d, label, size * s, fg, "center", bold)
+        return hov
+
     def segmented(self, wid, rect, options, value, on_change, size=13):
         """options: [(value, label)]. One button per option."""
         cells = rect.split_cols(len(options), gap=4 * self.s)
@@ -221,15 +309,22 @@ class Kit:
         track = Rect(rect.x, rect.cy - 3 * self.s, rect.w, 6 * self.s)
         self.p.rect(track, t.line, 3 * self.s)
         fill = Rect(track.x, track.y, track.w * max(0.0, min(1.0, value)), track.h)
-        self.p.rect(fill, color or t.blue, 3 * self.s)
+        self.p.rect(fill, (t.accent if t.sketchy else color) or t.blue, 3 * self.s)
         knob = 16 * self.s
         kx = rect.x + rect.w * max(0.0, min(1.0, value))
-        self.p.circle(kx, rect.cy, knob / 2, t.text)
+        if t.sketchy:
+            self.p.circle(kx, rect.cy, knob / 2, t.panel)
+            self.p.ring(kx, rect.cy, knob / 2, t.line_strong, 2 * self.s)
+        else:
+            self.p.circle(kx, rect.cy, knob / 2, t.text)
 
     def toggle(self, wid, rect, label, value, on_toggle, color=None):
         col = color or self.t.yellow
         hov, _p = self._hit(wid, rect, "button", on_click=lambda: on_toggle(not value))
         r = 9 * self.s
+        if self.t.sketchy:
+            self._sketch_button(rect, label, "ghost", value, True, 12, None, hov, False)
+            return
         if value:
             self.p.rect(rect, col[:3] + (0.14,), r)
             self.p.rect_outline(rect, col, r, 1)

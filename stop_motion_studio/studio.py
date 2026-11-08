@@ -23,9 +23,9 @@ from bpy.app.handlers import persistent
 from bpy_extras import view3d_utils
 from mathutils import Matrix, Quaternion, Vector
 
-from . import cameras, core, library, lighting, ops, puppet, sculpt, solid
+from . import cameras, core, library, lighting, ops, props, puppet, sculpt, solid
 from . import studio_puppets as sp
-from .studio_kit import Kit, Rect, Theme, studio_layout
+from .studio_kit import Kit, Rect, Theme, apply_look, studio_layout
 
 PROJECTS_DIR = os.path.join(os.path.expanduser("~"), "Stop Motion")
 ESCAPE_HINT = "Ctrl+Alt+Shift+B: Blender"
@@ -412,6 +412,7 @@ def draw_studio():
         from .studio_paint import GPUPainter
         S.painter = GPUPainter()
         S.kit = Kit(S.painter)
+    apply_look(props.get_look())
     region = ctx.region
     rv3d = ctx.region_data
     scene = ctx.scene
@@ -445,6 +446,8 @@ def draw_studio():
     # --- chrome backgrounds (they cover the 3D view everywhere but the live box)
     for key in ("top", "head_left", "head_centre", "head_right", "left", "right", "footer"):
         p.rect(L[key], t.ground if key in ("left", "right") else t.panel)
+        if t.grid is not None and key in ("left", "right"):
+            p.grid(L[key], 28 * s, t.grid)
     p.rect(Rect(L["top"].x, L["top"].y, L["top"].w, 1 * s), t.line)
     p.rect(Rect(L["footer"].x, L["footer"].top - 1 * s, L["footer"].w, 1 * s), t.line)
     for key in ("head_left", "head_centre", "head_right"):
@@ -503,7 +506,8 @@ def draw_top(kit, r, scene, s):
         kit.button("mode:" + mode, cell, label, (lambda m=mode: set_mode(m)), "tab", S.mode == mode)
     # right side
     bx = r.right - 16 * s
-    for wid, label, cb, w in (("projects", "Projects", lambda: set_overlay('PROJECTS'), 96),
+    for wid, label, cb, w in (("look", "Dark look" if t.sketchy else "Sketchbook", toggle_look, 116),
+                              ("projects", "Projects", lambda: set_overlay('PROJECTS'), 96),
                               ("save", "Save", save_project, 76),
                               ("library", "Bring in…", lambda: set_overlay('LIBRARY'), 100)):
         bx -= w * s
@@ -512,6 +516,13 @@ def draw_top(kit, r, scene, s):
     name = os.path.splitext(os.path.basename(bpy.data.filepath))[0] if bpy.data.filepath else "Not saved yet"
     state = "" if not bpy.data.is_dirty else " · changes"
     kit.label(Rect(bx - 300 * s, r.y, 290 * s, r.h), name + state, 13, t.muted, "right")
+
+
+def toggle_look():
+    props.set_look('DARK' if props.get_look() == 'SKETCH' else 'SKETCH')
+    apply_look(props.get_look())
+    toast("Sketchbook look" if Theme.sketchy else "Dark studio look")
+    redraw()
 
 
 def set_mode(mode):
@@ -748,7 +759,7 @@ def draw_review_left(kit, r, scene, s):
     cut_list = core.cuts(scene)
     if len(cut_list) > 1:
         y -= 22 * s
-        kit.label(Rect(r.x, y, r.w, 18 * s), "%d camera cuts" % (len(cut_list) - 1), 13, t.yellow)
+        kit.label(Rect(r.x, y, r.w, 18 * s), "%d camera cuts" % (len(cut_list) - 1), 13, t.mark)
 
 
 def play():
@@ -1146,7 +1157,7 @@ def draw_strip(kit, r, scene, s):
                 tw = min(thumb.w - 4 * s, kit.text_width(name, 10) + 10 * s)
                 tag = Rect(thumb.x + 2 * s, thumb.y + 2 * s, tw, 14 * s)
                 p.rect(tag, t.yellow, 3 * s)
-                p.text(tag, name, 10 * s, t.ground, "center", True)
+                p.text(tag, name, 10 * s, t.on_yellow, "center", True)
             if sel:
                 p.rect_outline(card, t.blue, 7 * s, 2 * s)
             kit.area("shot:%d" % i, card, on_click=(lambda k=i: run(bpy.ops.stop_motion.goto_shot, index=k) or redraw()),
@@ -1169,7 +1180,7 @@ def draw_strip(kit, r, scene, s):
     cams = core.shot_cameras(scene)
     if lc is not None and cams and cams[-1] != lc:
         p.rect(Rect(live.x - 4.5 * s, r.y, 3 * s, card_h), t.yellow, 1.5 * s)
-        p.text(Rect(live.x, live.y + 4 * s, live.w, 14 * s), lc.name, 10 * s, t.yellow, "center", True)
+        p.text(Rect(live.x, live.y + 4 * s, live.w, 14 * s), lc.name, 10 * s, t.mark, "center", True)
     kit.area("strip:live", live, on_click=lambda: run(bpy.ops.stop_motion.go_live) or redraw())
     p.unclip()
 

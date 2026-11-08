@@ -2,12 +2,57 @@
 """Draws the Studio kit with Blender's gpu and blf modules (pixel space)."""
 
 import math
+import os
 
 import blf
 import gpu
 from gpu_extras.batch import batch_for_shader
 
+from .studio_kit import Theme
+
 FONT = 0
+FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+_FONTS = {}
+
+
+def font_ids():
+    """(body, bold) font ids for the current look. Sketchbook uses hand-lettered fonts
+    shipped with the extension (Patrick Hand and Kalam, SIL Open Font Licence)."""
+    if not Theme.sketchy:
+        return FONT, FONT
+    if not _FONTS:
+        for key, name in (("body", "PatrickHand-Regular.ttf"), ("bold", "Kalam-Bold.ttf")):
+            fid = -1
+            try:
+                fid = blf.load(os.path.join(FONT_DIR, name))
+            except Exception:
+                pass
+            _FONTS[key] = fid if fid is not None and fid >= 0 else FONT
+    return _FONTS["body"], _FONTS["bold"]
+
+
+def _noise(seed, t):
+    """Smooth, repeatable wobble in -1..1 along an outline."""
+    return (math.sin(t * 0.11 + seed) * 0.6 + math.sin(t * 0.037 + seed * 1.7) * 0.4)
+
+
+def _wobbly(pts, amount, seed, step=18.0):
+    """Densify a closed outline and nudge each point sideways, like a hand-drawn line."""
+    out = []
+    n = len(pts)
+    run = 0.0
+    for i in range(n):
+        (x0, y0), (x1, y1) = pts[i], pts[(i + 1) % n]
+        dx, dy = x1 - x0, y1 - y0
+        L = math.hypot(dx, dy)
+        k = max(1, int(L / step))
+        nx, ny = (-dy / L, dx / L) if L > 1e-6 else (0.0, 0.0)
+        for j in range(k):
+            f = j / k
+            d = _noise(seed, run + L * f) * amount
+            out.append((x0 + dx * f + nx * d, y0 + dy * f + ny * d))
+        run += L
+    return out
 
 
 def _rounded(rect, r, seg=6):
@@ -77,11 +122,41 @@ class GPUPainter:
         sh.uniform_float("color", color)
         batch.draw(sh)
 
+    def _shape(self, rect, radius):
+        pts = _rounded(rect, radius)
+        if Theme.sketchy and radius > 0.5 and rect.w > 12 and rect.h > 12:
+            # the seed follows the box's size, not its place, so a button keeps its wobble when it moves
+            seed = (round(rect.w) * 7 + round(rect.h) * 13) % 97
+            pts = _wobbly(pts, min(1.6, 0.8 + min(rect.w, rect.h) * 0.004), seed)
+        return pts
+
     def rect(self, rect, color, radius=0):
-        self._fill(_rounded(rect, radius), color)
+        self._fill(self._shape(rect, radius), color)
 
     def rect_outline(self, rect, color, radius=0, width=1):
-        self._stroke(_rounded(rect.inset(width / 2), radius), color, width)
+        self._stroke(self._shape(rect.inset(width / 2), radius), color, width)
+
+    def grid(self, rect, step, color):
+        """Squared paper: thin lines every `step` pixels, lined up with the window."""
+        if color is None or step < 4:
+            return
+        lines = []
+        x = math.ceil(rect.x / step) * step
+        while x < rect.right:
+            lines += [(x, rect.y), (x, rect.top)]
+            x += step
+        y = math.ceil(rect.y / step) * step
+        while y < rect.top:
+            lines += [(rect.x, y), (rect.right, y)]
+            y += step
+        if not lines:
+            return
+        gpu.state.blend_set('ALPHA')
+        sh = self.uni
+        batch = batch_for_shader(sh, 'LINES', {"pos": lines})
+        sh.bind()
+        sh.uniform_float("color", color)
+        batch.draw(sh)
 
     def circle(self, cx, cy, r, color, seg=24):
         pts = [(cx + r * math.cos(2 * math.pi * i / seg), cy + r * math.sin(2 * math.pi * i / seg)) for i in range(seg)]
@@ -98,14 +173,23 @@ class GPUPainter:
         self._fill(pts, color)
 
     # ---- text
-    def text_width(self, text, size):
-        blf.size(FONT, size)
-        return blf.dimensions(FONT, text)[0]
+    def _font(self, size, bold=False):
+        body, heavy = font_ids()
+        fid = heavy if bold else body
+        if Theme.sketchy:
+            size *= 1.18   # hand fonts draw small for their size
+        blf.size(fid, size)
+        return fid
+
+    def text_width(self, text, size, bold=False):
+        fid = self._font(size, bold)
+        return blf.dimensions(fid, text)[0]
 
     def text(self, rect, text, size, color, align="left", bold=False):
         if not text:
             return
-        blf.size(FONT, size)
+        FONT = self._font(size, bold)
+        real_bold = bold and Theme.sketchy and font_ids()[1] != font_ids()[0]
         w = blf.dimensions(FONT, text)[0]
         if w > rect.w and rect.w > size:
             while text and blf.dimensions(FONT, text + "…")[0] > rect.w:
@@ -123,7 +207,7 @@ class GPUPainter:
         blf.color(FONT, *color)
         blf.position(FONT, round(x), round(y), 0)
         blf.draw(FONT, text)
-        if bold:  # the default font has no bold weight here: a faint double strike reads as bolder
+        if bold and not real_bold:  # the default font has no bold weight here: a faint double strike reads as bolder
             blf.position(FONT, round(x) + 0.6, round(y), 0)
             blf.draw(FONT, text)
 

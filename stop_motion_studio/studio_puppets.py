@@ -150,9 +150,14 @@ def draw_headers(kit, hl, hc, s):
             done = True
         kit.button("pstep:" + k, r, "", (lambda kk=k: set_step(kk)), "tab", here, enabled=(k in steps or done), size=12)
         dot = t.blue if here else (t.yellow if done else t.line_strong)
-        kit.p.circle(r.x + 15 * s, r.cy, 10 * s, dot)
+        if t.sketchy and not (here or done):
+            kit.p.circle(r.x + 15 * s, r.cy, 10 * s, t.panel)
+            kit.p.ring(r.x + 15 * s, r.cy, 10 * s, t.muted, 1.5 * s)
+        else:
+            kit.p.circle(r.x + 15 * s, r.cy, 10 * s, dot)
         num = "✓" if done else str(len([1 for kk in shown[:n + 1] if not (P.start == 'SCULPT' and kk == 'BUILD')]))
-        kit.label(Rect(r.x + 5 * s, r.y, 20 * s, r.h), num, 11, t.ground if (here or done) else t.muted, "center", True)
+        num_col = (t.on_yellow if done else (t.ground if here else t.muted)) if t.sketchy else (t.ground if (here or done) else t.muted)
+        kit.label(Rect(r.x + 5 * s, r.y, 20 * s, r.h), num, 11, num_col, "center", True)
         kit.label(Rect(r.x + 30 * s, r.y, w - 34 * s, r.h), label, 12, t.text if (here or done) else t.muted, "left", here)
         x += w + 6 * s
         if x > hc.right - 60 * s:
@@ -481,7 +486,7 @@ def _live_try(kit, live, ctx, s):
             kit.p.image(pic.inset(4 * s).fit_aspect(1.0), img)
         kit.label(Rect(r.x + 10 * s, r.y + 6 * s, r.w - 20 * s, 24 * s), rr["name"], 13, t.text, "left", True)
         kit.label(Rect(r.x + 10 * s, r.y + 6 * s, r.w - 20 * s, 24 * s),
-                  ("%d to look at" % len(rr["problems"])) if bad else "fine", 11, t.yellow if bad else (0.72, 0.88, 0.63, 1), "right")
+                  ("%d to look at" % len(rr["problems"])) if bad else "fine", 11, t.mark if bad else ((0.23, 0.56, 0.31, 1) if t.sketchy else (0.72, 0.88, 0.63, 1)), "right")
 
 
 def live_click(context, mx, my):
