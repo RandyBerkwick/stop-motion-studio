@@ -95,8 +95,10 @@ def kind_of(name):
         return "Head"
     if "hand" in n or "wrist" in n:
         return "hand"
-    if "foot" in n or "ankle" in n:
+    if "foot" in n or "ankle" in n or "paw" in n or "hoof" in n:
         return "foot"
+    if "tail" in n and "tip" not in n:
+        return "Tail"
     if "hip" in n or "pelvis" in n:
         return "Hips"
     if "chest" in n or "torso" in n:
@@ -117,6 +119,11 @@ def guess_rings(arm):
         label = ("%s %s" % (s, k)).strip() if k in ("hand", "foot") else k
         if k in ("hand", "foot") and not s:
             label = k.capitalize()
+        if k == "foot":                  # four legs: front and back feet
+            low = b.name.lower()
+            end = "front " if ("front" in low or "fore" in low) else "back " if ("back" in low or "hind" in low or "rear" in low) else ""
+            if end:
+                label = (end + label[0].lower() + label[1:]).capitalize()
         score = (0 if "ik" in b.name.lower() else 1, len(b.name))
         if label not in best or score < best[label][0]:
             best[label] = (score, b.name)
@@ -133,7 +140,8 @@ def guess_rings(arm):
             if b.name not in seen:
                 seen.append(b.name)
         return [(n.replace("_", " ").replace(".", " ").title(), n) for n in seen[:8]]
-    order = ["Head", "Body", "Hips", "Left hand", "Right hand", "Hand", "Left foot", "Right foot", "Foot"]
+    order = ["Head", "Body", "Hips", "Tail", "Left hand", "Right hand", "Hand", "Left foot", "Right foot", "Foot",
+             "Front left foot", "Front right foot", "Back left foot", "Back right foot"]
     return [(lbl, best[lbl][1]) for lbl in order if lbl in best] + \
            [(lbl, v[1]) for lbl, v in best.items() if lbl not in order]
 
@@ -146,7 +154,11 @@ def _split(name):
 
 
 def _nice(s):
-    return s.replace("_", " ").replace(".", " ").replace("-", " ").strip().capitalize()
+    s = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", s)          # LeftHand -> Left Hand, LookLeft -> Look Left
+    s = s.replace("_", " ").replace(".", " ").replace("-", " ").strip()
+    if s.isupper() and len(s) <= 4:
+        return s                                          # mouth shapes: AI, MBP, FV stay as they are
+    return s.capitalize()
 
 
 def puppet_meshes(arm, scene):
@@ -177,14 +189,14 @@ def guess_swap_sets(arm, scene):
                 found.append((_nice(pre), 'SHAPE', me, items))
     groups = {}
     for ob in meshes:
-        if ob.parent != arm:
+        if ob.parent != arm or ob.get("sm_part"):   # kit body parts aren't swaps
             continue
         pre, rest = _split(ob.name)
         if pre:
             groups.setdefault(pre, []).append((_nice(rest), ob))
     for pre, items in groups.items():
         if len(items) >= 2:
-            items.sort(key=lambda t: t[1].name)
+            items.sort(key=lambda t: (t[1].get("sm_order", 999), t[1].name))
             found.append((_nice(pre), 'MESH', None, items))
     return found
 
