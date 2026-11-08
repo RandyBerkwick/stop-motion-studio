@@ -23,6 +23,17 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Arrange: rays skip the dragged object and anything not solid; a cup slid onto the floor sits on it upright; a flower stuck to the side of a lumpy bush leans out along the surface (or stays upright) and nothing is left inside the bush; 21 stamped flowers are linked copies with varied size and spin, none buried; set pieces aren't keyed, moving one sticks in every shot, Make Set Piece clears old keys without moving it. Rendered and checked by eye.
 - Solid twist: a stick tipped over on its edge stops flat on the floor (90°); a box turned beside a wall stops when its corner meets it; Bramble's arm swung down stops when the hand meets the table (the other way is free); turning back out of contact is always free; nothing ends up inside.
 - 3D move and turn: X/Y/Z locks move only along that axis; Shift/wheel push along the line of sight so the part stays put on screen; an axis pointing at you moves with mouse up/down instead of jumping; trackball turns go the way you drag (right turns the front right, up turns it up); Shift is a quarter speed; X/Y/Z/V turns stay on one axis; a stick tipped corner-first about a slanted axis stops flat on the floor (90°); Bramble's arm turned down in 3D stops at the table in every direction that reaches it and never ends up inside; Esc puts things back; the axis line shows and goes away.
+- Camera cuts: each shot keeps its camera; playback switches at the cuts and stays on the live camera; "to the next cut" and "this shot only" change just those shots; deleting, holding and duplicating keep every shot's camera; "just look" doesn't change the film; the ghost only shows earlier shots from the same camera.
+- Export: the GIF has one frame per shot, held as long as the shot (total length matches the film), right way up; back-and-forth GIFs don't repeat the ends; final-render GIFs render each shot; the GIF encoder's output decodes correctly (checked against Pillow, including noisy frames). The Blender scene copy opens and the working file stays the same.
+- Review: loop, back and forth (turns at both ends) and last N shots play the right frames; shooting stops playback; stopping goes back to live.
+- Library: adding keeps rigs with their meshes and foot pins; files with collections list each; bringing in sets up a puppet (rings, swaps), a prop or a set piece, standing on the floor where the camera looks.
+- Clay tools: all eight brushes switch in Blender 5.2; size and strength set.
+- Own parts solid: a hand pushed into the belly stops at it and never ends up inside; one foot can't pass through the other; the joint a part turns at doesn't block it; can be switched off.
+- Knee targets: adding pins and knee targets doesn't move the legs; knees keep pointing forward through deep crouches.
+- Rigs with IK feet: their IK becomes the pin (switching off doesn't make the leg jump; the switch is keyed with each shot).
+- Held props: placed exactly where asked and still follow the hand.
+- Arranging: sliding along the floor stops at a box standing on it; moving onto the box puts it on top.
+- Torch sweep: the beam turns one way across the run and is off before and after. Painting copies: about one per spacing along a stroke. Strip: cards are as wide as their holds; clicks find the card or its edge and miss everywhere else. Saving on quit writes the project and puts Blender's prompt setting back.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -104,18 +115,32 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 60. Solid world off: the same tools work, they just don't stop at anything (and props don't drop).
 61. In the Studio the hints show as a toast at the bottom; tell me if any of the keys clash with something.
 
+## Round 2 (1.0.0)
+62. Camera cuts. Add a Camera B (+ in the camera bar). Live, click Camera B: shoot a few. Back to Camera A, shoot a few. Play: the film cuts A → B → A. The strip shows yellow marks and camera names at the cuts.
+63. Step onto an A shot in the middle of the A run, click Camera B: that shot and the rest of that run switch, the next cut stays. Blender panel: "This shot" switches just one.
+64. Review: Play › Back & forth bounces; Last plays the last N shots (slider). Space plays and stops.
+65. Export › GIF: a .gif in the films folder; each shot shows for its hold. With Back & forth chosen it bounces. Final render GIF takes longer but has full lighting.
+66. Export › Blender scene: a *_scene.blend copy; open it in plain Blender: the animation and the camera cuts play without the add-on.
+67. Bring in…: put a .blend with a rigged puppet in ~/Stop Motion/Library (or select Bramble › "Add what's selected"). Bring it in as Puppet: it stands on the set where the camera looks, with rings ready. A prop: green ring. A set piece: stays put.
+68. D in the Studio: the swap pop-up at the mouse; clicks swap; click outside or Esc closes.
+69. Sculpt tab › Sculpt here: clay tool buttons, size, strength; each tool feels right on clay.
+70. Drag Bramble's body ring down and forward: his chest stops at his thighs. Drag a foot ring across the other foot: it stops. Set tab › "Puppets' own parts are solid" off: passes.
+71. Deep crouch with pinned feet (hips ring right down): the knees stay pointing forward, no flipping.
+72. Hold the mug, then drag its green ring: it moves with Shift/X/Y/Z like everything else, and stays in the hand. Alt+drag turns it in the hand.
+73. During a drag press X twice: the line turns to the part's own X (useful on a tilted head or hand).
+74. Arrange: slide the mug along the table into a vase or box standing on it: it stops against it. Move the mouse onto the box: it hops on top.
+75. Stamp copies: press and drag across the bush: flowers along the stroke, spaced by "Copy spacing".
+76. Light › Torch sweep on a shot: over the next 6 shots a warm beam sweeps across the set; off before and after.
+77. Normal Blender, Stop Motion workspace: shot cards along the bottom of the camera view. Click one: goes there. Drag its right edge: hold changes. LIVE: back to live. View panel › "Shot strip on camera" turns it off.
+78. Mac: rebuild the launcher (`scripts/make_mac_launcher.sh`): the app has the Studio icon, and the Dock shows it while the Studio is open.
+79. Change something in the Studio and quit (Cmd+Q): no Blender dialog, and the work is saved (a never-saved project lands in ~/Stop Motion). In normal Blender, quitting asks as usual.
+
 ## Known gaps
-- In normal Blender the shot cards are still a grid in the sidebar (the Studio has the strip).
-- Studio: no file browser for bringing in a puppet yet (use the hidden way back); swap pop-up (D) not in the Studio; sculpt brushes are Blender's default brush.
-- Studio: Blender's own dialogs (save changes on quit, crash reports) still look like Blender.
-- The Mac launcher still shows Blender's icon in the Dock.
-- Switching the filming camera isn't part of the shots yet (it's for checking angles).
-- The ghost comes from whichever camera took each shot, so it lines up only on that camera.
-- Axis locks are world axes (not the part's own axes) for now.
-- A prop held in a hand still uses Blender's move/rotate (relative to the hand), without the 3D keys above.
-- Arranging pushes things out of what they land on; things it passes on the way aren't checked (it follows the mouse, not a path).
-- Stamp places one copy per click (no brush/drag-painting yet).
-- A puppet's own parts can pass through each other (hand into own body).
+- In normal Blender the Dock still says "Blender" (the icon changes only while the Studio is open), and Blender's crash report window looks like Blender.
+- Library items are listed by name (no thumbnails yet).
+- "As shot" GIFs use the shot pictures: a lighting effect added after shooting shows only in a final-render GIF (or re-shoot those shots).
+- Own parts: the joint a part turns at is never counted as in the way, so a hand can still sink into the shoulder it hangs from on an extreme pose.
+- Arranging checks things standing on the surface you're sliding on; hopping onto another object doesn't check what's in between.
 - Sculpting is on the mesh at rest (the shape is added on top of the pose), so very big posed changes are easier in Blender than in Nomad.
 - Nomad remesh, Dynamic Topology or Multires change the mesh: the sculpt is then fitted to the surface (close, not exact).
 - Rigs that already have IK foot controls (e.g. Rigify) get rings on those controls and no extra pins.

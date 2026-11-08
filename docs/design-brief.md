@@ -39,7 +39,8 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 launcher working on Mac; merged.**
 7. Arranging the set: slide and stick on surfaces, stamp copies, set pieces. **0.7.0 tested headless and rendered; merged.**
 8. Solid twist: turning parts and props stops where they'd touch something. **0.8.0 tested headless; merged.**
-9. 3D move and turn: further/nearer (Shift or wheel), X/Y/Z locks with a guide line, trackball turning, turns around one axis or the view; solid or not. **0.9.0 built on branch move-3d; tested headless.**
+9. 3D move and turn: further/nearer (Shift or wheel), X/Y/Z locks with a guide line, trackball turning, turns around one axis or the view; solid or not. **0.9.0 built; tested headless.**
+10. Round 2: camera cuts, GIF and Blender-scene export, review modes (loop, back and forth, last N); library (bring in puppets/props/sets), swap pop-up and clay tools in the Studio; own parts solid, knee targets, rigs with IK feet, held props in 3D, own-axis locks, arranging stops at things on the surface; painting copies, torch sweep, shot strip in normal Blender, Studio Dock icon, save on quit. **1.0.0 built on branch finish; tested headless and rendered.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
@@ -50,10 +51,12 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Licence: add-ons using bpy are GPL.
 
 ## Decided defaults (can change)
-- Switching camera setups is for checking angles; it isn't recorded in shots (yet).
+- Camera cuts: each shot remembers its camera. Live, picking a camera sets the next shots; on a shot, it changes that shot and the rest of its run up to the next cut. Cuts are camera markers, so playback, export and the Blender-scene copy follow them.
+- Quitting from the Studio saves instead of asking (unsaved projects go to ~/Stop Motion).
+- The library is a folder of .blend files (~/Stop Motion/Library).
 - Light changes hold until changed again: lights are keyed with every shot.
 - Posing over a sculpted shot keeps its sculpt.
 - Nomad bridge is a file round trip (OBJ in iCloud Drive › Stop Motion Nomad); in Nomad, import with "Keep topology" for an exact match.
 
 ## Open questions
-- Should camera switches become edit points in the film (cut to camera B for shots 20–30)?
+- Library thumbnails: render a picture of each item when it's added?

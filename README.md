@@ -17,6 +17,19 @@ Your normal Blender theme, preferences and keymap are never changed: the app tem
 
 `tools/preview_studio.py` renders the Studio off-screen to a PNG (software GPU), for checking the interface without a window.
 
+While the Studio is open, quitting saves your work instead of showing Blender's "save changes?" box (a project that was never saved goes into ~/Stop Motion). On a Mac the Dock shows the Studio's icon.
+
+## What's in it
+- **Shoot:** pose, Enter; each shot holds for 1, 2 or 3 frames (drag a card's edge for any length). Go back to pose over, delete, duplicate. Ghost of the shots before.
+- **Camera cuts:** each shot remembers the camera that filmed it. Click a camera while live: the next shots film with it. Click one while on a shot: that shot and the rest of its run (up to the next cut) cut to it. Playback and export follow the cuts; cuts show as yellow marks in the strip.
+- **Puppets:** Make Puppet turns a rig into grab rings (drag moves, Alt+drag turns, Shift: nearer/further, X/Y/Z: one direction, twice: the part's own axis), swap parts (D for the pop-up), foot pins with knee targets. Rigs with their own IK feet use their IK as the pin.
+- **Solid world:** parts and props stop at the set and at the puppet's own other parts; props drop onto surfaces and can be held in a hand.
+- **Library (Bring in…):** puppets, props and set pieces kept as .blend files in ~/Stop Motion/Library; bring one in and it stands where the camera is looking, set up and ready. "Add what's selected" keeps something for other projects.
+- **Arranging the set:** slide things along surfaces (they stop at what stands there), stamp copies by clicking or painting a stroke, set pieces stay put in every shot.
+- **Light:** studio and sky presets, light per shot, effects: flicker, lightning flash, fade to night, lights out, torch sweep.
+- **Sculpt a shot:** clay tools (build up, clay, thumb, smooth, push & pull, puff, crease, flatten) or a round trip through Nomad Sculpt.
+- **Review & export:** loop, back and forth, or the last few shots; Movie, Frames, GIF (one frame per shot, held as long as the shot) or a Blender scene copy.
+
 ## Install (to use it)
 ```sh
 scripts/build.sh
@@ -53,6 +66,11 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | `app_template/StopMotionStudio` | App template: opens straight into the Studio |
 | `stop_motion_studio/puppet.py` | Make Puppet: ring guessing, swap sets, foot pins |
 | `stop_motion_studio/rings.py` | Grab ring gizmos in the free view and the drag operator |
+| `stop_motion_studio/solid.py` | Solid world: 3D drag and turn that stop at surfaces, props, holding |
+| `stop_motion_studio/library.py` | The library: bring in / add puppets, props and set pieces |
+| `stop_motion_studio/gif.py` | Animated GIF writer (palette, LZW) |
+| `stop_motion_studio/strip.py` | Shot strip along the bottom of the camera view in normal Blender |
+| `stop_motion_studio/macos.py` | Dock icon (macOS) |
 
 ## Keys in the Studio
 | Key | Does |
@@ -66,6 +84,7 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | F5 / Esc | Hide / show the interface |
 | F6 | Ghost on / off |
 | Cmd+S / Cmd+O | Save / Projects |
+| D | Swap parts pop-up at the mouse |
 | Cmd+Z | Undo |
 | Ctrl+Alt+Shift+B | Normal Blender (and back) |
 
