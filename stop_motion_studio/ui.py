@@ -128,7 +128,8 @@ class SM_PT_puppet(bpy.types.Panel):
         row.operator("stop_motion.rescan_swaps", icon='FILE_REFRESH').puppet = arm.name
 
         box = layout.box()
-        box.label(text="Grab rings (drag; Alt+drag twists)")
+        box.label(text="Grab rings: drag moves, Alt+drag turns")
+        box.label(text="Shift: nearer/further · X Y Z: one direction")
         for r in pp.rings:
             row = box.row(align=True)
             row.prop(r, "label", text="")

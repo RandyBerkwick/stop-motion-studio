@@ -22,6 +22,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Studio: layout (live box centred, panels tile the window), widget clicks, drags, sliders, wheel, hold handles; shot pictures rendered off-screen and saved; free-view picture renders; drag-to-hold changes holds a frame per card width, never below 1; a failed start rolls back so Blender is never left half-hidden. Screens rendered off-screen and checked by eye.
 - Arrange: rays skip the dragged object and anything not solid; a cup slid onto the floor sits on it upright; a flower stuck to the side of a lumpy bush leans out along the surface (or stays upright) and nothing is left inside the bush; 21 stamped flowers are linked copies with varied size and spin, none buried; set pieces aren't keyed, moving one sticks in every shot, Make Set Piece clears old keys without moving it. Rendered and checked by eye.
 - Solid twist: a stick tipped over on its edge stops flat on the floor (90°); a box turned beside a wall stops when its corner meets it; Bramble's arm swung down stops when the hand meets the table (the other way is free); turning back out of contact is always free; nothing ends up inside.
+- 3D move and turn: X/Y/Z locks move only along that axis; Shift/wheel push along the line of sight so the part stays put on screen; an axis pointing at you moves with mouse up/down instead of jumping; trackball turns go the way you drag (right turns the front right, up turns it up); Shift is a quarter speed; X/Y/Z/V turns stay on one axis; a stick tipped corner-first about a slanted axis stops flat on the floor (90°); Bramble's arm turned down in 3D stops at the table in every direction that reaches it and never ends up inside; Esc puts things back; the axis line shows and goes away.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -95,6 +96,14 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 54. Alt+drag the mug's ring to tip it: it stops against the table or wall; let go and a tipped mug settles back onto its surface.
 55. Arranging: wheel-spinning a prop next to a wall never pushes it into the wall.
 
+## 3D move and turn (0.9.0)
+56. Drag a hand ring, then hold Shift and move the mouse up: the hand goes further away from you (it stays under the same spot on screen); down brings it nearer. The wheel does the same in steps. Let go of Shift: dragging is across the view again.
+57. While dragging, press Z: a blue line appears and the hand only goes up and down. X (red): only side to side. Y (green): front to back. Press the same letter again: free.
+58. Alt+drag a hand ring: the arm turns like a ball under your finger (right turns it right, up turns it up). While turning press X, Y or Z: it turns around that axis only; V: around the view (the old twist). Shift: fine.
+59. Solid world on: turning the arm down into the table stops at the table, from any direction. Ctrl passes through.
+60. Solid world off: the same tools work, they just don't stop at anything (and props don't drop).
+61. In the Studio the hints show as a toast at the bottom; tell me if any of the keys clash with something.
+
 ## Known gaps
 - In normal Blender the shot cards are still a grid in the sidebar (the Studio has the strip).
 - Studio: no file browser for bringing in a puppet yet (use the hidden way back); swap pop-up (D) not in the Studio; sculpt brushes are Blender's default brush.
@@ -102,7 +111,8 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - The Mac launcher still shows Blender's icon in the Dock.
 - Switching the filming camera isn't part of the shots yet (it's for checking angles).
 - The ghost comes from whichever camera took each shot, so it lines up only on that camera.
-- Twists turn around the view direction (like Blender's R); no trackball turning yet.
+- Axis locks are world axes (not the part's own axes) for now.
+- A prop held in a hand still uses Blender's move/rotate (relative to the hand), without the 3D keys above.
 - Arranging pushes things out of what they land on; things it passes on the way aren't checked (it follows the mouse, not a path).
 - Stamp places one copy per click (no brush/drag-painting yet).
 - A puppet's own parts can pass through each other (hand into own body).

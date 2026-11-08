@@ -28,7 +28,7 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>com.randyberkwick.stopmotionstudio</string>
   <key>CFBundleExecutable</key><string>Stop Motion Studio</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.8.0</string>
+  <key>CFBundleShortVersionString</key><string>0.9.0</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
 </dict>
 </plist>

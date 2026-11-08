@@ -39,6 +39,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 launcher working on Mac; merged.**
 7. Arranging the set: slide and stick on surfaces, stamp copies, set pieces. **0.7.0 tested headless and rendered; merged.**
 8. Solid twist: turning parts and props stops where they'd touch something. **0.8.0 tested headless; merged.**
+9. 3D move and turn: further/nearer (Shift or wheel), X/Y/Z locks with a guide line, trackball turning, turns around one axis or the view; solid or not. **0.9.0 built on branch move-3d; tested headless.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.

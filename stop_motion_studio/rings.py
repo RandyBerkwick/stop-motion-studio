@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Grab rings in the free view. Drag a ring to move that part; Alt+drag
-twists it. Bones that can't move on their own (joined to their parent,
+"""Grab rings in the free view. Drag a ring to move that part (Shift or the
+wheel: further/nearer, X/Y/Z: one direction); Alt+drag turns it in 3D. Bones that can't move on their own (joined to their parent,
 like most heads) twist on a plain drag. Rings never show in the camera view."""
 
 import bpy
@@ -34,7 +34,7 @@ def _inside(region, rv3d, pos, box):
 
 
 class SM_OT_grab_ring(bpy.types.Operator):
-    """Drag to move this part. Alt+drag to twist it"""
+    """Drag to move this part (Shift: nearer/further, X/Y/Z: one direction). Alt+drag to turn it"""
     bl_idname = "stop_motion.grab_ring"
     bl_label = "Grab Ring"
     bl_options = {'REGISTER', 'UNDO'}
@@ -53,7 +53,6 @@ class SM_OT_grab_ring(bpy.types.Operator):
         twist = event.alt
         vl = context.view_layer
 
-        solid_world = context.scene.stop_motion.solid_world
         if ring.pin is not None and puppet.is_pinned(arm, ring) and not twist:
             if context.mode != 'OBJECT':
                 bpy.ops.object.mode_set(mode='OBJECT')
@@ -61,10 +60,7 @@ class SM_OT_grab_ring(bpy.types.Operator):
                 ob.select_set(False)
             ring.pin.select_set(True)
             vl.objects.active = ring.pin
-            if solid_world:
-                bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
-            else:
-                bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
+            bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
             return {'FINISHED'}
 
         pb = arm.pose.bones.get(ring.bone)
@@ -82,15 +78,11 @@ class SM_OT_grab_ring(bpy.types.Operator):
             other.select = False
         pb.select = True
         arm.data.bones.active = arm.data.bones[ring.bone]
+        # our own drag and turn work in full 3D; they only stop at surfaces when the solid world is on
         if twist or pb.bone.use_connect:
-            if solid_world:
-                bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
-            else:
-                bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
-        elif solid_world:
-            bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
+            bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
         else:
-            bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
+            bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
         return {'FINISHED'}
 
 

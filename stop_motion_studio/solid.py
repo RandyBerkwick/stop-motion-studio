@@ -8,6 +8,11 @@ of the move slides along the surface they hit (so a foot dragged down and
 sideways ends up sliding along the floor). Hold Ctrl while dragging to
 pass through.
 
+Dragging and turning are full 3D: Shift (or the wheel) pushes a part
+further away or nearer, X/Y/Z keep it to one direction; turning rolls it
+like a ball, or round one axis (X/Y/Z) or the view (V). With the solid
+world off the same tools just don't stop at surfaces.
+
 Solid = every visible mesh, except the thing being moved (and, for a
 puppet, its own body). Untick "Solid" on an object to let things pass.
 
@@ -292,10 +297,174 @@ def let_go(context, ob):
     context.view_layer.update()
 
 
+# ------------------------------------------------------- shared 3D helpers
+
+AXES = {'X': Vector((1.0, 0.0, 0.0)), 'Y': Vector((0.0, 1.0, 0.0)), 'Z': Vector((0.0, 0.0, 1.0))}
+AXIS_COLORS = {'X': (1.0, 0.35, 0.35, 0.95), 'Y': (0.55, 0.9, 0.35, 0.95),
+               'Z': (0.4, 0.62, 1.0, 0.95), 'VIEW': (1.0, 0.8, 0.35, 0.95)}
+AXIS_WORDS = {'X': "side to side (X)", 'Y': "front to back (Y)", 'Z': "up and down (Z)", 'VIEW': "around the view"}
+
+
+def view_frame(rv3d):
+    """(right, up, toward viewer, eye) of a 3D view, in world space."""
+    vi = rv3d.view_matrix.inverted()
+    right = vi.col[0].xyz.normalized()
+    up = vi.col[1].xyz.normalized()
+    back = vi.col[2].xyz.normalized()
+    return right, up, back, vi.translation.copy()
+
+
+def axis_point(origin, direction, anchor, axis):
+    """The point on the line anchor + t·axis closest to the ray origin + s·direction."""
+    w0 = anchor - origin
+    a, b, c = axis.dot(axis), axis.dot(direction), direction.dot(direction)
+    d, e = axis.dot(w0), direction.dot(w0)
+    den = a * c - b * b
+    if abs(den) < 1e-9:
+        return anchor.copy()      # looking straight down the axis
+    return anchor + axis * ((b * e - c * d) / den)
+
+
+def _first_hit(cur, nxt, tree, eps):
+    """Smallest fraction of the step cur→nxt at which any point enters a surface from its front."""
+    best = None
+    for p0, p1 in zip(cur, nxt):
+        seg = p1 - p0
+        length = seg.length
+        if length < 1e-9:
+            continue
+        d = seg / length
+        loc, normal, _i, dist = tree.ray_cast(p0, d, length + eps)
+        if loc is not None and normal.dot(d) < 0.0:
+            frac = max(0.0, (dist - eps) / length)
+            best = frac if best is None else min(best, frac)
+    return best
+
+
+def turn_limit(points, pivot, q_from, q_to, tree, eps=0.002, step_deg=2.0):
+    """Turn `points` about `pivot` from rotation q_from toward q_to (any 3D turn).
+
+    Returns (allowed rotation, blocked). The turn is swept in steps of at
+    most `step_deg`; the first step that would carry a point into a surface
+    from its front stops just short of it. Turning out of contact is free."""
+    import math
+    if tree is None or not points:
+        return q_to.copy(), False
+    ang = q_from.rotation_difference(q_to).angle
+    if ang < 1e-9:
+        return q_to.copy(), False
+    n = max(1, int(math.ceil(ang / math.radians(step_deg))))
+    rel = [p - pivot for p in points]
+    cur = [pivot + q_from @ r for r in rel]
+    for i in range(1, n + 1):
+        q = q_from.slerp(q_to, i / n)
+        nxt = [pivot + q @ r for r in rel]
+        f = _first_hit(cur, nxt, tree, eps)
+        if f is not None:
+            return q_from.slerp(q_to, (i - 1 + f) / n), True
+        cur = nxt
+    return q_to.copy(), False
+
+
+def _rotate_about(pivot, axis, angle):
+    return Matrix.Translation(pivot) @ Matrix.Rotation(angle, 4, axis) @ Matrix.Translation(-pivot)
+
+
+def twist_limit(points, pivot, axis, start, end, tree, eps=0.002, step_deg=2.0):
+    """Turn `points` about one axis from angle `start` toward `end`.
+    Returns (allowed angle, blocked); see turn_limit."""
+    import math
+    if tree is None or not points or abs(end - start) < 1e-9:
+        return end, False
+    axis = axis.normalized()
+    n = max(1, int(math.ceil(abs(end - start) / math.radians(step_deg))))
+    da = (end - start) / n
+    a = start
+    rel = [p - pivot for p in points]
+    rot_a = Matrix.Rotation(a, 3, axis)
+    cur = [pivot + rot_a @ r for r in rel]
+    for _ in range(n):
+        rot_b = Matrix.Rotation(a + da, 3, axis)
+        nxt = [pivot + rot_b @ r for r in rel]
+        f = _first_hit(cur, nxt, tree, eps)
+        if f is not None:
+            return a + da * f, True
+        a += da
+        cur = nxt
+    return a, False
+
+
+# ------------------------------------------------------- axis line drawing
+
+_GUIDE = {"handle": None, "origin": None, "axis": None, "color": None}
+
+
+def _draw_guide():
+    if _GUIDE["origin"] is None:
+        return
+    import gpu
+    from gpu_extras.batch import batch_for_shader
+    o, a = _GUIDE["origin"], _GUIDE["axis"]
+    sh = gpu.shader.from_builtin('POLYLINE_UNIFORM_COLOR')
+    batch = batch_for_shader(sh, 'LINES', {"pos": [o - a * 50.0, o + a * 50.0]})
+    region = bpy.context.region
+    gpu.state.blend_set('ALPHA')
+    sh.bind()
+    sh.uniform_float("viewportSize", (region.width, region.height))
+    sh.uniform_float("lineWidth", 2.0)
+    sh.uniform_float("color", _GUIDE["color"])
+    batch.draw(sh)
+    gpu.state.blend_set('NONE')
+
+
+def show_guide(origin, axis_name, axis=None):
+    if axis_name is None:
+        hide_guide()
+        return
+    _GUIDE["origin"] = origin.copy()
+    _GUIDE["axis"] = (axis if axis is not None else AXES[axis_name]).normalized()
+    _GUIDE["color"] = AXIS_COLORS[axis_name]
+    if _GUIDE["handle"] is None:
+        _GUIDE["handle"] = bpy.types.SpaceView3D.draw_handler_add(_draw_guide, (), 'WINDOW', 'POST_VIEW')
+    _redraw_views()
+
+
+def hide_guide():
+    _GUIDE["origin"] = None
+    if _GUIDE["handle"] is not None:
+        bpy.types.SpaceView3D.draw_handler_remove(_GUIDE["handle"], 'WINDOW')
+        _GUIDE["handle"] = None
+    _redraw_views()
+
+
+def _redraw_views():
+    wm = bpy.context.window_manager
+    for win in getattr(wm, "windows", ()):
+        for area in win.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+
+def _say(context, text):
+    from . import studio
+    if studio.is_active():
+        studio.toast(text, 0.8)
+        studio.redraw()
+    elif context.area:
+        context.area.header_text_set(text)
+
+
+def _axis_key(event):
+    if event.value == 'PRESS' and event.type in {'X', 'Y', 'Z'} and not (event.ctrl or event.oskey):
+        return event.type
+    return None
+
+
 # -------------------------------------------------------------- solid drag
 
 class SM_OT_solid_drag(bpy.types.Operator):
-    """Drag a part or prop; it stops at anything solid. Ctrl: pass through. Esc/right-click: cancel"""
+    """Drag a part or prop in 3D. Shift (or the wheel): further away / nearer. X/Y/Z: along one axis.
+    With the solid world on it stops at anything solid; Ctrl passes through. Esc/right-click: cancel"""
     bl_idname = "stop_motion.solid_drag"
     bl_label = "Solid Drag"
     bl_options = {'REGISTER', 'UNDO', 'BLOCKING'}
@@ -314,10 +483,10 @@ class SM_OT_solid_drag(bpy.types.Operator):
             if ob is None:
                 return False
             self.target_ob = ob
-            self.anchor = ob.matrix_world.translation.copy()
+            self.start = world_matrix(context, ob)
+            self.anchor = self.start.translation.copy()
             self.points = object_points(context, ob)
             exclude = {ob} | set(ob.children_recursive)
-            self.start = ob.matrix_world.copy()
         else:
             arm = bpy.data.objects.get(self.puppet)
             if arm is None or not (0 <= self.ring < len(arm.stop_motion_puppet.rings)):
@@ -337,7 +506,8 @@ class SM_OT_solid_drag(bpy.types.Operator):
                 self.start = pb.matrix.copy()
                 self.to_pose = arm.matrix_world.to_3x3().inverted()
                 self.points = ring_points(context, arm, ring, ring.bone)
-        self.tree = obstacle_tree(scene, dg, exclude)
+        self.solid = scene.stop_motion.solid_world
+        self.tree = obstacle_tree(scene, dg, exclude) if self.solid else None
         return True
 
     def _apply(self, move):
@@ -348,39 +518,119 @@ class SM_OT_solid_drag(bpy.types.Operator):
             m.translation = m.translation + self.to_pose @ move
             self.target_bone.matrix = m
 
+    # -- where the mouse says the part should go (a move from the start)
+    def _ray_dir(self, point):
+        _r, _u, back, eye = view_frame(self.rv3d)
+        if self.rv3d.is_perspective:
+            d = point - eye
+            if d.length > 1e-6:
+                return d.normalized()
+        return -back
+
+    def _here(self, mouse, depth_point):
+        return view3d_utils.region_2d_to_location_3d(self.region, self.rv3d, mouse, depth_point)
+
+    def wanted(self):
+        """The move the mouse asks for, from the drag's start."""
+        origin = self.anchor + self.base
+        if self.lock:
+            axis = AXES[self.lock]
+            _r, _u, back, _e = view_frame(self.rv3d)
+            facing = axis.dot(back)
+            if abs(facing) > 0.6:
+                # the axis points at you: the mouse can't follow it, so up/down pushes along it
+                away = -1.0 if facing > 0 else 1.0
+                return self.base + axis * (away * (self.eff.y - self.press.y) * self._step_depth() * 0.002)
+            def t(mouse):
+                o = view3d_utils.region_2d_to_origin_3d(self.region, self.rv3d, mouse)
+                v = view3d_utils.region_2d_to_vector_3d(self.region, self.rv3d, mouse)
+                return (axis_point(o, v, origin, axis) - origin).dot(axis)
+            return self.base + axis * (t(self.eff) - t(self.press))
+        target = origin + self._ray_dir(origin) * self.depth
+        return self.base + (self._here(self.eff, target) - self._here(self.press, target)) + (target - origin)
+
+    def _rebase(self):
+        """Keep where the part is now, and measure the next movement from here."""
+        self.base = self.move.copy()
+        self.press = self.eff.copy()
+        self.depth = 0.0
+
+    def _step_depth(self):
+        _r, _u, _b, eye = view_frame(self.rv3d)
+        dist = ((self.anchor + self.base) - eye).length if self.rv3d.is_perspective else self.rv3d.view_distance
+        return max(0.01, dist)
+
     def invoke(self, context, event):
         if context.region_data is None or not self._setup(context):
             return {'CANCELLED'}
         self.region = context.region
         self.rv3d = context.region_data
+        m = Vector((event.mouse_region_x, event.mouse_region_y))
+        self.press, self.eff, self.last = m.copy(), m.copy(), m.copy()
+        self.base = Vector((0.0, 0.0, 0.0))
+        self.move = Vector((0.0, 0.0, 0.0))
+        self.depth = 0.0
+        self.lock = None
         context.window_manager.modal_handler_add(self)
         context.window.cursor_modal_set('HAND')
+        self._hint(context, False)
         return {'RUNNING_MODAL'}
 
+    def _hint(self, context, blocked):
+        if blocked:
+            _say(context, "Touching something solid · Ctrl to pass through")
+        elif self.lock:
+            _say(context, "Moving %s only · %s again: free" % (AXIS_WORDS[self.lock], self.lock))
+        else:
+            _say(context, "Drag · Shift or wheel: further / nearer · X Y Z: one direction · Esc: cancel")
+
+    def _update(self, context, event):
+        want = self.wanted()
+        if event.ctrl or self.tree is None:
+            self.move, blocked = want, False
+        else:
+            self.move, blocked = solve(self.points, want, self.tree)
+        self._apply(self.move)
+        self._hint(context, blocked)
+
     def _finish(self, context, cancelled):
+        hide_guide()
         context.window.cursor_modal_restore()
-        context.area.header_text_set(None)
+        if context.area:
+            context.area.header_text_set(None)
         if cancelled:
             self._apply(Vector((0, 0, 0)))
             return {'CANCELLED'}
-        if self.target_ob is not None and is_prop(self.target_ob) and \
+        if self.solid and self.target_ob is not None and is_prop(self.target_ob) and \
                 getattr(self.target_ob, "stop_motion_falls", True):
             drop_to_surface(context, self.target_ob)
         return {'FINISHED'}
 
     def modal(self, context, event):
         if event.type == 'MOUSEMOVE':
-            mouse = (event.mouse_region_x, event.mouse_region_y)
-            here = view3d_utils.region_2d_to_location_3d(self.region, self.rv3d, mouse, self.anchor)
-            want = here - self.anchor
-            if event.ctrl:
-                move, blocked = want, False
+            m = Vector((event.mouse_region_x, event.mouse_region_y))
+            delta = m - self.last
+            self.last = m
+            if event.shift and not self.lock:
+                # Shift: up/down pushes it away from you / pulls it nearer, it stays put on screen
+                self.depth += delta.y * self._step_depth() * 0.002
             else:
-                move, blocked = solve(self.points, want, self.tree)
-            self._apply(move)
-            context.area.header_text_set(
-                "Touching something solid · Ctrl to pass through" if blocked else
-                "Drag · release to drop · Ctrl: pass through · Esc: cancel")
+                self.eff = self.eff + delta
+            self._update(context, event)
+            return {'RUNNING_MODAL'}
+        if event.type in {'WHEELUPMOUSE', 'WHEELDOWNMOUSE'} and not self.lock:
+            self.depth += (1 if event.type == 'WHEELUPMOUSE' else -1) * self._step_depth() * 0.05
+            self._update(context, event)
+            return {'RUNNING_MODAL'}
+        key = _axis_key(event)
+        if key:
+            self._rebase()
+            self.lock = None if self.lock == key else key
+            if self.lock:
+                show_guide(self.anchor + self.base, self.lock)
+            else:
+                hide_guide()
+            self._update(context, event)
             return {'RUNNING_MODAL'}
         if event.type in {'LEFTMOUSE', 'RET', 'NUMPAD_ENTER'} and event.value in {'RELEASE', 'PRESS'}:
             if event.type != 'LEFTMOUSE' or event.value == 'RELEASE':
@@ -390,54 +640,13 @@ class SM_OT_solid_drag(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
-# -------------------------------------------------------------- solid twist
-
-def _rotate_about(pivot, axis, angle):
-    return Matrix.Translation(pivot) @ Matrix.Rotation(angle, 4, axis) @ Matrix.Translation(-pivot)
-
-
-def twist_limit(points, pivot, axis, start, end, tree, eps=0.002, step_deg=2.0):
-    """Turn `points` about `pivot`/`axis` from angle `start` toward `end`.
-
-    Returns (allowed angle, blocked). Each small step is swept as straight
-    segments; a step that would carry any point into a surface from its
-    front stops the turn just short of it. Turning away from contact (out
-    of a surface) is always free, like the solid drag."""
-    import math
-    if tree is None or not points or abs(end - start) < 1e-9:
-        return end, False
-    axis = axis.normalized()
-    n = max(1, int(math.ceil(abs(end - start) / math.radians(step_deg))))
-    da = (end - start) / n
-    a = start
-    rel = [p - pivot for p in points]
-    rot_a = Matrix.Rotation(a, 3, axis)
-    cur = [pivot + rot_a @ r for r in rel]
-    for _ in range(n):
-        rot_b = Matrix.Rotation(a + da, 3, axis)
-        nxt = [pivot + rot_b @ r for r in rel]
-        best = None
-        for p0, p1 in zip(cur, nxt):
-            seg = p1 - p0
-            length = seg.length
-            if length < 1e-9:
-                continue
-            d = seg / length
-            loc, normal, _i, dist = tree.ray_cast(p0, d, length + eps)
-            if loc is not None and normal.dot(d) < 0.0:
-                frac = max(0.0, (dist - eps) / length)
-                best = frac if best is None else min(best, frac)
-        if best is not None:
-            return a + da * best, True
-        a += da
-        cur = nxt
-    return a, False
-
+# -------------------------------------------------------------- solid turn
 
 class SM_OT_solid_twist(bpy.types.Operator):
-    """Turn a part or prop around the view; it stops where it would touch something. Ctrl: pass through. Esc: cancel"""
+    """Turn a part or prop in 3D, like rolling a ball. X/Y/Z: around one axis, V: around the view.
+    With the solid world on it stops where it would touch something; Ctrl passes through. Esc: cancel"""
     bl_idname = "stop_motion.solid_twist"
-    bl_label = "Solid Twist"
+    bl_label = "Solid Turn"
     bl_options = {'REGISTER', 'UNDO', 'BLOCKING'}
 
     puppet: StringProperty()
@@ -472,72 +681,121 @@ class SM_OT_solid_twist(bpy.types.Operator):
             pts = ring_points(context, arm, ring, ring.bone, exclude_pinned=(ring.pin is None))
             exclude = own_meshes(scene, arm)
         self.points = pts
-        self.tree = obstacle_tree(scene, dg, exclude)
+        self.solid = scene.stop_motion.solid_world
+        self.tree = obstacle_tree(scene, dg, exclude) if self.solid else None
         return True
 
-    def _apply(self, angle):
-        R = _rotate_about(self.pivot, self.axis, angle)
+    def _apply(self, q):
+        R = Matrix.Translation(self.pivot) @ q.to_matrix().to_4x4() @ Matrix.Translation(-self.pivot)
         if self.ob is not None:
             self.ob.matrix_world = R @ self.start
         else:
             mw = self.arm.matrix_world
             self.pb.matrix = mw.inverted() @ R @ mw @ self.start
 
-    def _screen_angle(self, event):
+    def _screen_angle(self, m):
         import math
-        m = (event.mouse_region_x - self.pivot2d.x, event.mouse_region_y - self.pivot2d.y)
-        return math.atan2(m[1], m[0])
+        return math.atan2(m.y - self.pivot2d.y, m.x - self.pivot2d.x)
+
+    def _axis(self):
+        if self.mode == 'VIEW':
+            return view_frame(self.rv3d)[2]
+        return AXES[self.mode]
+
+    def turn_for(self, delta, m, fine):
+        """The extra turn (a Quaternion) a mouse movement asks for."""
+        import math
+        from mathutils import Quaternion
+        k = 0.01 * (0.25 if fine else 1.0)     # radians per pixel
+        right, up, back, _eye = view_frame(self.rv3d)
+        if self.mode == 'BALL':
+            axis = up * delta.x - right * delta.y
+            if axis.length < 1e-9:
+                return Quaternion()
+            return Quaternion(axis.normalized(), delta.length * k)
+        axis = self._axis()
+        facing = axis.dot(back)
+        a = self._screen_angle(m)
+        if abs(facing) > 0.35:
+            # the axis points at you (or away): turn by going round the part on screen
+            d = (a - self.last_screen + math.pi) % (2 * math.pi) - math.pi
+            angle = d * (1.0 if facing > 0 else -1.0) * (0.25 if fine else 1.0)
+        else:
+            # the axis lies across the screen: push across it
+            p0 = view3d_utils.location_3d_to_region_2d(self.region, self.rv3d, self.pivot)
+            p1 = view3d_utils.location_3d_to_region_2d(self.region, self.rv3d, self.pivot + axis)
+            if p0 is None or p1 is None or (p1 - p0).length < 1e-6:
+                return Quaternion()
+            s = (p1 - p0).normalized()
+            across = Vector((-s.y, s.x))
+            angle = -(delta.x * across.x + delta.y * across.y) * k
+        return Quaternion(axis, angle)
 
     def invoke(self, context, event):
+        from mathutils import Quaternion
         rv3d = context.region_data
         if rv3d is None or not self._setup(context):
             return {'CANCELLED'}
+        self.region, self.rv3d = context.region, rv3d
         p2 = view3d_utils.location_3d_to_region_2d(context.region, rv3d, self.pivot)
         if p2 is None:
             return {'CANCELLED'}
         self.pivot2d = p2
-        self.axis = (rv3d.view_rotation @ Vector((0, 0, 1))).normalized()   # towards the viewer
-        self.last_screen = self._screen_angle(event)
-        self.want = 0.0      # where the mouse says
-        self.angle = 0.0     # where the part is allowed to be
+        m = Vector((event.mouse_region_x, event.mouse_region_y))
+        self.last = m
+        self.last_screen = self._screen_angle(m)
+        self.q = Quaternion()     # the turn so far (allowed)
+        self.mode = 'BALL'
         context.window_manager.modal_handler_add(self)
         context.window.cursor_modal_set('SCROLL_XY')
+        self._hint(context, False)
         return {'RUNNING_MODAL'}
 
-    def _say(self, context, text):
-        from . import studio
-        if studio.is_active():
-            studio.toast(text, 0.8)
-            studio.redraw()
-        elif context.area:
-            context.area.header_text_set(text)
+    def _hint(self, context, blocked):
+        if blocked:
+            _say(context, "Touching something solid · Ctrl to pass through")
+        elif self.mode == 'BALL':
+            _say(context, "Turn like a ball · X Y Z: one axis · V: around the view · Shift: fine · Esc: cancel")
+        else:
+            _say(context, "Turning %s · %s again: free" % (AXIS_WORDS[self.mode], self.mode[0]))
 
     def _finish(self, context, cancel):
+        from mathutils import Quaternion
+        hide_guide()
         context.window.cursor_modal_restore()
         if context.area:
             context.area.header_text_set(None)
         if cancel:
-            self._apply(0.0)
+            self._apply(Quaternion())
             return {'CANCELLED'}
-        if self.ob is not None and is_prop(self.ob) and getattr(self.ob, "stop_motion_falls", True) \
-                and held_by(self.ob) is None:
+        if self.solid and self.ob is not None and is_prop(self.ob) and \
+                getattr(self.ob, "stop_motion_falls", True) and held_by(self.ob) is None:
             drop_to_surface(context, self.ob)   # a tipped prop settles back onto its surface
         return {'FINISHED'}
 
     def modal(self, context, event):
-        import math
         if event.type == 'MOUSEMOVE':
-            a = self._screen_angle(event)
-            d = (a - self.last_screen + math.pi) % (2 * math.pi) - math.pi   # unwrap
-            self.last_screen = a
-            self.want += d * (0.25 if event.shift else 1.0)
-            if event.ctrl:
-                self.angle, blocked = self.want, False
+            m = Vector((event.mouse_region_x, event.mouse_region_y))
+            delta = m - self.last
+            dq = self.turn_for(delta, m, event.shift)
+            self.last = m
+            self.last_screen = self._screen_angle(m)
+            want = dq @ self.q
+            if event.ctrl or self.tree is None:
+                self.q, blocked = want, False
             else:
-                self.angle, blocked = twist_limit(self.points, self.pivot, self.axis, self.angle, self.want, self.tree)
-            self._apply(self.angle)
-            self._say(context, "Touching something solid · Ctrl to pass through" if blocked
-                      else "Turn · Shift: fine · Ctrl: pass through · Esc: cancel")
+                self.q, blocked = turn_limit(self.points, self.pivot, self.q, want, self.tree)
+            self._apply(self.q)
+            self._hint(context, blocked)
+            return {'RUNNING_MODAL'}
+        key = _axis_key(event) or ('VIEW' if event.type == 'V' and event.value == 'PRESS' else None)
+        if key:
+            self.mode = 'BALL' if self.mode == key else key
+            if self.mode == 'BALL':
+                hide_guide()
+            else:
+                show_guide(self.pivot, self.mode, self._axis())
+            self._hint(context, False)
             return {'RUNNING_MODAL'}
         if event.type in {'LEFTMOUSE', 'RET', 'NUMPAD_ENTER'} and event.value in {'RELEASE', 'PRESS'}:
             if event.type != 'LEFTMOUSE' or event.value == 'RELEASE':
@@ -643,7 +901,7 @@ class SM_OT_let_go(bpy.types.Operator):
 
 
 class SM_OT_grab_prop(bpy.types.Operator):
-    """Drag to move this prop. Alt+drag to turn it"""
+    """Drag to move this prop (Shift: nearer/further). Alt+drag to turn it in 3D"""
     bl_idname = "stop_motion.grab_prop"
     bl_label = "Grab Prop"
     bl_options = {'REGISTER', 'UNDO'}
@@ -660,16 +918,16 @@ class SM_OT_grab_prop(bpy.types.Operator):
             o.select_set(False)
         ob.select_set(True)
         context.view_layer.objects.active = ob
-        solid_on = context.scene.stop_motion.solid_world and held_by(ob) is None
-        if event.alt:
-            if solid_on:
-                bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', prop=ob.name)
-            else:
+        if held_by(ob) is not None:
+            # in a hand: Blender's own tools move it relative to the hand
+            if event.alt:
                 bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
-        elif solid_on:
-            bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', prop=ob.name)
+            else:
+                bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
+        elif event.alt:
+            bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', prop=ob.name)
         else:
-            bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
+            bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', prop=ob.name)
         return {'FINISHED'}
 
 
@@ -688,6 +946,10 @@ def register():
 
 
 def unregister():
+    try:
+        hide_guide()
+    except Exception:
+        pass
     del bpy.types.Object.stop_motion_falls
     del bpy.types.Object.stop_motion_solid
     del bpy.types.Object.stop_motion_prop

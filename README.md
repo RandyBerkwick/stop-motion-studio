@@ -71,6 +71,19 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 
 Drag the right edge of a card in the shot strip to hold that shot longer or shorter.
 
+**Moving and turning parts** (rings, in the Studio and in Blender):
+
+| While dragging a ring | Does |
+|---|---|
+| Drag | Move across the view |
+| Shift + drag up/down, or the wheel | Push it further away / pull it nearer (it stays put on screen) |
+| X / Y / Z | Move along that one direction only (a coloured line shows it); again: free |
+| Alt + drag (heads: plain drag) | Turn it like rolling a ball |
+| X / Y / Z while turning | Turn around that axis only; V: around the view |
+| Shift while turning | Fine turning |
+| Ctrl | Pass through solid things |
+| Esc / right-click | Put it back |
+
 **Arranging the set** (Set tab): Arrange, then drag anything along surfaces; it sticks without sinking in. Wheel spins, Alt leans or stands upright, Ctrl moves freely, Esc puts it back. Stamp copies: select an object, then click on surfaces to place varied copies (flowers on a bush). Set pieces stay put in every shot.
 
 ## Keys in normal Blender (3D view)
