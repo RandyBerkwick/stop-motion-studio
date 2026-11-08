@@ -420,15 +420,25 @@ class SM_PT_review(bpy.types.Panel):
         sm = context.scene.stop_motion
         layout = self.layout
         row = layout.row(align=True)
-        playing = context.screen.is_animation_playing
+        from . import ops as _ops
+        playing = _ops.is_playing(context)
         row.operator("stop_motion.play", text="Pause" if playing else "Play",
                      icon='PAUSE' if playing else 'PLAY')
         row.prop(sm, "fps", text="")
+        row = layout.row(align=True)
+        row.prop(sm, "play_mode", expand=True)
+        if sm.play_mode == 'LAST':
+            layout.prop(sm, "play_last")
         row = layout.row(align=True)
         op = row.operator("stop_motion.export", text="Movie", icon='FILE_MOVIE')
         op.kind = 'MOVIE'
         op = row.operator("stop_motion.export", text="Frames", icon='IMAGE_DATA')
         op.kind = 'FRAMES'
+        row = layout.row(align=True)
+        op = row.operator("stop_motion.export", text="GIF", icon='FILE_IMAGE')
+        op.kind, op.bounce = 'GIF', sm.play_mode == 'BOUNCE'
+        op = row.operator("stop_motion.export", text="Blender scene", icon='FILE_BLEND')
+        op.kind = 'BLEND'
 
 
 class SM_PT_view(bpy.types.Panel):
@@ -485,8 +495,8 @@ def draw_hud():
 
 @persistent
 def on_frame_change(scene, _depsgraph=None):
-    screen = bpy.context.screen
-    if screen is not None and screen.is_animation_playing:
+    from . import ops as _ops
+    if _ops.is_playing():
         return
     if bpy.app.is_job_running('RENDER'):
         return

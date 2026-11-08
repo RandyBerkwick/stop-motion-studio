@@ -23,7 +23,7 @@ from bpy.app.handlers import persistent
 from bpy_extras import view3d_utils
 from mathutils import Matrix, Quaternion, Vector
 
-from . import cameras, core, lighting, puppet, sculpt, solid
+from . import cameras, core, lighting, ops, puppet, sculpt, solid
 from .studio_kit import Kit, Rect, Theme, studio_layout
 
 PROJECTS_DIR = os.path.join(os.path.expanduser("~"), "Stop Motion")
@@ -353,7 +353,7 @@ def fit_camera(context, region, rv3d, box):
 
 def _ghost_uids(scene):
     sm = scene.stop_motion
-    if not sm.ghost_enabled or (bpy.context.screen and bpy.context.screen.is_animation_playing):
+    if not sm.ghost_enabled or ops.is_playing():
         return []
     frame = scene.frame_current
     cur = core.shot_index_at(scene, frame)
@@ -663,7 +663,7 @@ def draw_review_left(kit, r, scene, s):
     y = r.top
     kit.label(Rect(r.x, y - 24 * s, r.w, 24 * s), "Watch it back", 16, t.text, "left", True)
     y -= 78 * s
-    playing = bpy.context.screen.is_animation_playing
+    playing = ops.is_playing()
     kit.button("rv:play", Rect(r.x, y, r.w, 44 * s), "Pause" if playing else "Play", play,
                "accent", icon="pause" if playing else "play", size=15)
     y -= 34 * s
@@ -671,9 +671,24 @@ def draw_review_left(kit, r, scene, s):
     y -= 38 * s
     kit.segmented("fps", Rect(r.x, y, r.w, 32 * s), [('8', "8 fps"), ('12', "12 fps"), ('24', "24 fps")],
                   sm.fps, lambda v: setattr(sm, "fps", v) or redraw(), size=12)
-    y -= 50 * s
+    y -= 34 * s
+    kit.label(Rect(r.x, y, r.w, 18 * s), "PLAY", 11, t.soft, "left", True)
+    y -= 38 * s
+    kit.segmented("pmode", Rect(r.x, y, r.w, 32 * s), [('LOOP', "Loop"), ('BOUNCE', "Back & forth"), ('LAST', "Last")],
+                  sm.play_mode, lambda v: setattr(sm, "play_mode", v) or redraw(), size=12)
+    if sm.play_mode == 'LAST':
+        y -= 40 * s
+        kit.label(Rect(r.x, y, 110 * s, 30 * s), "Last %d shots" % sm.play_last, 12, t.text)
+        kit.slider("plast", Rect(r.x + 116 * s, y, r.w - 124 * s, 30 * s), (sm.play_last - 2) / 48.0,
+                   lambda v: setattr(sm, "play_last", int(round(2 + v * 48))) or redraw())
+    y -= 44 * s
+    first, last = ops.play_range(scene)
     total = core.live_frame(scene) - scene.frame_start
     kit.label(Rect(r.x, y, r.w, 18 * s), "%d shots · %.1f s" % (len(sm.shots), total / max(1, scene.render.fps)), 13, t.muted)
+    cut_list = core.cuts(scene)
+    if len(cut_list) > 1:
+        y -= 22 * s
+        kit.label(Rect(r.x, y, r.w, 18 * s), "%d camera cuts" % (len(cut_list) - 1), 13, t.yellow)
 
 
 def play():
@@ -914,17 +929,35 @@ def draw_sculpt(kit, r, ctx, scene, s):
 def draw_export(kit, r, scene, s):
     col = Column(kit, r, s)
     col.title("Export")
-    cells = col.row(56).split_cols(2, 6 * s)
-    for cell, (k, label) in zip(cells, (('MOVIE', "Movie (MP4)"), ('FRAMES', "Frames (PNG)"))):
-        kit.button("ek:" + k, cell, label, (lambda kk=k: setattr(S, "export_kind", kk) or redraw()), selected=S.export_kind == k)
-    col.heading("QUALITY")
-    cells = col.row(40).split_cols(2, 6 * s)
-    for cell, (k, label) in zip(cells, (('AS_SHOT', "As shot"), ('FINAL', "Final render"))):
-        kit.button("eq:" + k, cell, label, (lambda kk=k: setattr(S, "export_quality", kk) or redraw()), selected=S.export_quality == k)
-    col.note("As shot is quick. Final render uses full lighting.")
-    kit.button("export", col.row(48), "Make the movie" if S.export_kind == 'MOVIE' else "Save the frames",
-               lambda: run(bpy.ops.stop_motion.export, 'EXEC_DEFAULT', kind=S.export_kind, quality=S.export_quality) or toast("Exporting to the films folder"),
-               "accent", size=15, enabled=len(scene.stop_motion.shots) > 0)
+    kinds = (('MOVIE', "Movie (MP4)"), ('FRAMES', "Frames (PNG)"), ('GIF', "GIF"), ('BLEND', "Blender scene"))
+    for pair in (kinds[:2], kinds[2:]):
+        cells = col.row(48).split_cols(2, 6 * s)
+        for cell, (k, label) in zip(cells, pair):
+            kit.button("ek:" + k, cell, label, (lambda kk=k: setattr(S, "export_kind", kk) or redraw()), selected=S.export_kind == k)
+    if S.export_kind != 'BLEND':
+        col.heading("QUALITY")
+        cells = col.row(40).split_cols(2, 6 * s)
+        for cell, (k, label) in zip(cells, (('AS_SHOT', "As shot"), ('FINAL', "Final render"))):
+            kit.button("eq:" + k, cell, label, (lambda kk=k: setattr(S, "export_quality", kk) or redraw()), selected=S.export_quality == k)
+        col.note("As shot is quick. Final render uses full lighting.")
+    if S.export_kind == 'GIF':
+        sm = scene.stop_motion
+        bounce = sm.play_mode == 'BOUNCE'
+        col.note("Plays back and forth (from Play)" if bounce else "Loops (Play › Back & forth makes it bounce)")
+    if S.export_kind == 'BLEND':
+        col.note("A copy of the scene: shots are keyframes, cuts are camera markers.")
+    label = {'MOVIE': "Make the movie", 'FRAMES': "Save the frames", 'GIF': "Make the GIF",
+             'BLEND': "Save the scene"}[S.export_kind]
+    kit.button("export", col.row(48), label, do_export, "accent", size=15, enabled=len(scene.stop_motion.shots) > 0)
+
+
+def do_export():
+    scene = bpy.context.scene
+    bounce = scene.stop_motion.play_mode == 'BOUNCE'
+    r = run(bpy.ops.stop_motion.export, 'EXEC_DEFAULT', kind=S.export_kind, quality=S.export_quality, bounce=bounce)
+    if r == {'FINISHED'}:
+        toast("Saved in the films folder" if S.export_kind in {'GIF', 'BLEND'} else "Exporting to the films folder")
+    redraw()
 
 
 # ------------------------------------------------------------------ footer
@@ -961,7 +994,7 @@ def draw_footer(kit, r, scene, s):
             kit.button(wid, Rect(x, bar.cy - 17 * s, w * s, 34 * s), label, cb, "danger" if wid == "del" else "ghost", size=12)
             x += (w + 6) * s
         kit.button("live", Rect(x + 6 * s, bar.cy - 17 * s, 110 * s, 34 * s), "Back to live", lambda: run(bpy.ops.stop_motion.go_live) or redraw(), size=12)
-    playing = bpy.context.screen.is_animation_playing
+    playing = ops.is_playing()
     total = core.live_frame(scene) - scene.frame_start
     info = "%d shots · %.1f s" % (len(sm.shots), total / max(1, scene.render.fps))
     iw = kit.text_width(info, 13)

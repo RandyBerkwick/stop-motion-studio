@@ -59,6 +59,13 @@ class SM_Settings(bpy.types.PropertyGroup):
         name="Speed",
         items=[('8', "8 fps", ""), ('12', "12 fps", ""), ('24', "24 fps", "")],
         default='12', update=_on_fps)
+    play_mode: EnumProperty(
+        name="Play",
+        items=[('LOOP', "Loop", "Play from the start, round and round"),
+               ('BOUNCE', "Back and forth", "Forwards, then backwards"),
+               ('LAST', "Last shots", "Just the last few shots, round and round")],
+        default='LOOP')
+    play_last: IntProperty(name="Last shots", min=2, max=50, default=10)
     key_scope: EnumProperty(
         name="Shoot captures",
         items=[('ALL', "Everything", "Every puppet, prop and camera"),

@@ -101,7 +101,8 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
         from . import studio
         if rv3d.view_perspective == 'CAMERA' and not studio.is_active():
             return False
-        if context.screen and context.screen.is_animation_playing:
+        from . import ops as _ops
+        if _ops.is_playing(context):
             return False
         from . import arrange
         if arrange.ARR["active"]:

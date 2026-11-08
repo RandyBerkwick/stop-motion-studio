@@ -3,7 +3,7 @@ import os
 import shutil
 
 import bpy
-from bpy.props import EnumProperty, IntProperty
+from bpy.props import BoolProperty, EnumProperty, IntProperty
 
 from . import core
 
@@ -33,6 +33,8 @@ On an earlier shot, this replaces it with the new pose"""
 
     def execute(self, context):
         scene = context.scene
+        if PLAYER["on"]:
+            stop_playing(scene, back_to_live=False)
         sm = scene.stop_motion
         objs = core.tracked_objects(scene, context, sm.key_scope)
         index = core.shot_index_at(scene, scene.frame_current)
@@ -226,18 +228,104 @@ class SM_OT_toggle_ghost(bpy.types.Operator):
         return {'FINISHED'}
 
 
+# ------------------------------------------------------------------ playback
+# Our own player (a timer), because Blender's can't play back and forth.
+
+PLAYER = {"on": False, "dir": 1, "start": 1, "end": 1, "scene": None, "back_to": None}
+
+
+def play_range(scene):
+    """(first, last) frame to play for the chosen review mode."""
+    sm = scene.stop_motion
+    last = core.live_frame(scene) - 1
+    first = scene.frame_start
+    if sm.play_mode == 'LAST' and len(sm.shots) > sm.play_last:
+        first = core.shot_start(scene, len(sm.shots) - sm.play_last)
+    return first, max(first, last)
+
+
+def is_playing(context=None):
+    if PLAYER["on"]:
+        return True
+    screen = getattr(context or bpy.context, "screen", None)
+    return bool(screen and screen.is_animation_playing)
+
+
+def _tick():
+    if not PLAYER["on"]:
+        return None
+    scene = PLAYER["scene"]
+    try:
+        sm = scene.stop_motion
+    except (ReferenceError, AttributeError):
+        PLAYER["on"] = False
+        return None
+    first, last = play_range(scene)
+    f = scene.frame_current + PLAYER["dir"]
+    if sm.play_mode == 'BOUNCE':
+        if f > last:
+            PLAYER["dir"] = -1
+            f = max(first, last - 1)
+        elif f < first:
+            PLAYER["dir"] = 1
+            f = min(last, first + 1)
+    elif f > last or f < first:
+        f = first
+    scene.frame_set(f)
+    _redraw_all()
+    return 1.0 / max(1.0, scene.render.fps / scene.render.fps_base)
+
+
+def _redraw_all():
+    wm = bpy.context.window_manager
+    for win in getattr(wm, "windows", ()):
+        for area in win.screen.areas:
+            if area.type == 'VIEW_3D':
+                area.tag_redraw()
+
+
+def start_playing(scene):
+    core.sync_range(scene)
+    first, last = play_range(scene)
+    PLAYER.update(on=True, dir=1, scene=scene, back_to=scene.frame_current)
+    if not (first <= scene.frame_current <= last) or scene.frame_current >= last:
+        scene.frame_set(first)
+    core.update_ghost(scene)          # the ghost is hidden while playing
+    if not bpy.app.timers.is_registered(_tick):
+        bpy.app.timers.register(_tick, first_interval=0.0)
+
+
+def stop_playing(scene=None, back_to_live=True):
+    was = PLAYER["on"]
+    PLAYER["on"] = False
+    if bpy.app.timers.is_registered(_tick):
+        bpy.app.timers.unregister(_tick)
+    scene = scene or PLAYER["scene"]
+    if was and scene is not None:
+        try:
+            if back_to_live:
+                scene.frame_set(core.live_frame(scene))
+            core.update_ghost(scene)
+        except ReferenceError:
+            pass
+    _redraw_all()
+
+
 class SM_OT_play(bpy.types.Operator):
-    """Play the shots in a loop"""
+    """Play the shots (loop, back and forth, or just the last few). Again: stop"""
     bl_idname = "stop_motion.play"
     bl_label = "Play"
 
     def execute(self, context):
         scene = context.scene
-        core.sync_range(scene)
-        if not context.screen.is_animation_playing:
-            if scene.frame_current >= scene.frame_end:
-                scene.frame_set(scene.frame_start)
-        bpy.ops.screen.animation_play()
+        screen = context.screen
+        if screen is not None and screen.is_animation_playing:
+            bpy.ops.screen.animation_cancel(restore_frame=False)
+            return {'FINISHED'}
+        if PLAYER["on"]:
+            stop_playing(scene)
+        else:
+            start_playing(scene)
         return {'FINISHED'}
 
 
@@ -246,8 +334,12 @@ class SM_OT_export(bpy.types.Operator):
     bl_idname = "stop_motion.export"
     bl_label = "Export"
 
-    kind: EnumProperty(items=[('MOVIE', "Movie (MP4)", ""), ('FRAMES', "Frames (PNG)", "")],
+    kind: EnumProperty(items=[('MOVIE', "Movie (MP4)", ""), ('FRAMES', "Frames (PNG)", ""),
+                              ('GIF', "GIF", "A small looping animation to share"),
+                              ('BLEND', "Blender scene", "A copy of the scene for finishing in Blender")],
                        default='MOVIE')
+    bounce: BoolProperty(name="Back and forth", default=False,
+                         description="GIF plays forwards then backwards")
     quality: EnumProperty(items=[('AS_SHOT', "As shot", "Quick: like the camera view"),
                                  ('FINAL', "Final render", "Full lighting, takes longer")],
                           default='AS_SHOT')
@@ -264,8 +356,18 @@ class SM_OT_export(bpy.types.Operator):
         r = scene.render
         core.sync_range(scene)
         base = os.path.splitext(bpy.path.basename(bpy.data.filepath))[0] or "stop_motion"
-        out_dir = bpy.path.abspath("//films/") if bpy.data.filepath else os.path.join(core.capture_dir(scene), "films")
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir = films_dir(scene)
+        if self.kind == 'GIF':
+            path = export_gif(context, scene, os.path.join(out_dir, base + ".gif"), self.quality, self.bounce)
+            if path is None:
+                self.report({'WARNING'}, "No shot pictures to make a GIF from")
+                return {'CANCELLED'}
+            self.report({'INFO'}, "Saved " + path)
+            return {'FINISHED'}
+        if self.kind == 'BLEND':
+            path = export_blend(scene, os.path.join(out_dir, base + "_scene.blend"))
+            self.report({'INFO'}, "Saved " + path)
+            return {'FINISHED'}
         if self.kind == 'MOVIE':
             r.image_settings.file_format = 'FFMPEG'
             r.ffmpeg.format = 'MPEG4'
@@ -287,6 +389,98 @@ class SM_OT_export(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def films_dir(scene):
+    d = bpy.path.abspath("//films/") if bpy.data.filepath else os.path.join(core.capture_dir(scene), "films")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def image_rgb(img):
+    """A Blender image as an HxWx3 uint8 array, top row first."""
+    import numpy as np
+    w, h = img.size
+    if w == 0 or h == 0:
+        return None
+    px = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    px = px.reshape(h, w, 4)[::-1, :, :3]
+    return np.clip(np.rint(px * 255.0), 0, 255).astype(np.uint8)
+
+
+def _render_final(scene, path):
+    bpy.ops.render.render(write_still=False)
+    result = bpy.data.images.get("Render Result")
+    if result is None:
+        return None
+    fmt = scene.render.image_settings.file_format
+    try:
+        scene.render.image_settings.file_format = 'PNG'
+        result.save_render(path, scene=scene)
+    finally:
+        scene.render.image_settings.file_format = fmt
+    return path
+
+
+def gif_frames(context, scene, quality='AS_SHOT', width=640):
+    """One picture per shot and how long each is held. As shot: the shot pictures; final: rendered."""
+    import tempfile
+    frames, holds = [], []
+    keep = scene.frame_current
+    tmp = os.path.join(tempfile.gettempdir(), "stop_motion_gif.png")
+    try:
+        for _i, shot, start, hold in core.shot_spans(scene):
+            img = None
+            if quality == 'FINAL':
+                scene.frame_set(start)
+                if _render_final(scene, tmp):
+                    img = bpy.data.images.load(tmp, check_existing=False)
+            else:
+                img = core.shot_image(scene, shot.uid)
+            rgb = image_rgb(img) if img is not None else None
+            if quality == 'FINAL' and img is not None:
+                bpy.data.images.remove(img)
+            if rgb is None:
+                if holds:
+                    holds[-1] += hold      # no picture: the one before stays up longer
+                continue
+            from . import gif
+            rgb = gif.resize(rgb, width)
+            if frames and rgb.shape != frames[0].shape:
+                continue
+            frames.append(rgb)
+            holds.append(hold)
+    finally:
+        scene.frame_set(keep)
+    return frames, holds
+
+
+def export_gif(context, scene, path, quality='AS_SHOT', bounce=False, width=640):
+    from . import gif
+    frames, holds = gif_frames(context, scene, quality, width)
+    if not frames:
+        return None
+    if bounce and len(frames) > 2:
+        frames = frames + frames[-2:0:-1]
+        holds = holds + holds[-2:0:-1]
+    return gif.write(path, frames, gif.delays_cs(holds, scene.render.fps / scene.render.fps_base))
+
+
+def export_blend(scene, path):
+    """A copy of the file for finishing in Blender: the shots are ordinary keyframes,
+    the cuts are camera markers; the ghost pictures are left out."""
+    for ob in scene.objects:
+        if ob.type == 'CAMERA':
+            bgs = ob.data.background_images
+            for bg in list(bgs):
+                if bg.image is not None and bg.image.name.startswith(core.GHOST_PREFIX):
+                    bgs.remove(bg)
+    try:
+        bpy.ops.wm.save_as_mainfile(filepath=path, copy=True, relative_remap=True)
+    finally:
+        core.update_ghost(scene)
+    return path
+
+
 classes = (SM_OT_shoot, SM_OT_delete_shot, SM_OT_hold, SM_OT_duplicate_shot,
            SM_OT_goto_shot, SM_OT_step, SM_OT_go_live, SM_OT_toggle_ghost,
            SM_OT_play, SM_OT_export)
@@ -298,5 +492,6 @@ def register():
 
 
 def unregister():
+    stop_playing(back_to_live=False)
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
