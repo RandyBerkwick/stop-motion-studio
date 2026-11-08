@@ -441,6 +441,34 @@ class SM_PT_review(bpy.types.Panel):
         op.kind = 'BLEND'
 
 
+class SM_PT_library(bpy.types.Panel):
+    bl_label = "Library"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = CATEGORY
+    bl_order = 7
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        from . import library
+        layout = self.layout
+        files = library.list_files()
+        if not files:
+            layout.label(text="Empty: add .blend files to the folder", icon='INFO')
+        for f in files:
+            box = layout.box()
+            box.label(text=f[:-6], icon='FILE_BLEND')
+            for name, label in library.contents(os.path.join(library.LIBRARY_DIR, f)):
+                row = box.row(align=True)
+                row.label(text=label)
+                for kind, text in (('PUPPET', "Puppet"), ('PROP', "Prop"), ('SET', "Set")):
+                    op = row.operator("stop_motion.bring_in", text=text)
+                    op.path, op.item, op.kind = f, name, kind
+        row = layout.row(align=True)
+        row.operator("stop_motion.add_to_library", icon='ADD')
+        row.operator("stop_motion.open_library", text="", icon='FILE_FOLDER')
+
+
 class SM_PT_view(bpy.types.Panel):
     bl_label = "View"
     bl_space_type = 'VIEW_3D'
@@ -531,7 +559,7 @@ def _register_keys():
 
 
 classes = (SM_UL_shots, SM_PT_shoot, SM_PT_puppet, SM_PT_swap_popup, SM_PT_props, SM_PT_cameras, SM_PT_lighting, SM_PT_sculpt,
-           SM_PT_shots, SM_PT_review, SM_PT_view)
+           SM_PT_shots, SM_PT_review, SM_PT_library, SM_PT_view)
 
 
 def register():

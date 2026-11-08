@@ -64,8 +64,31 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
     scene.stop_motion_views.add().name = "Side on"
     scene.stop_motion_views.add().name = "Hands close"
 
+    env = os.environ.get
+    if env("SM_PREVIEW_CUTS") and REAL:
+        cam_a = scene.camera
+        cam_b = cam_a.copy(); cam_b.data = cam_a.data.copy(); cam_b.name = "Camera B"
+        scene.collection.objects.link(cam_b)
+        cam_b.location.x += 1.2
+        core.set_camera(scene, 3, cam_b, 'RUN')
+        core.set_camera(scene, 6, cam_a, 'RUN')
+        scene.frame_current = core.live_frame(scene)
     studio.S.mode = mode
     studio.S.side = side
+    if env("SM_PREVIEW_LIB"):
+        from stop_motion_studio import library
+        library.LIBRARY_DIR = env("SM_PREVIEW_LIB")
+        studio.S.lib_file = env("SM_PREVIEW_LIBFILE")
+    if env("SM_PREVIEW_SCULPT"):
+        body = next(o for o in scene.objects if o.type == 'MESH' and o.parent == arm and o.visible_get()
+                    and len(o.data.vertices) > 200)
+        for o in ctx.selected_objects: o.select_set(False)
+        vl.objects.active = body; body.select_set(True)
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.mode_set(mode='SCULPT')
+        from stop_motion_studio import sculpt
+        sculpt.set_brush(bpy.context, "Clay Strips")
+        scene.stop_motion_sculpting = "%s|x" % body.name
     studio.S.active = False
     p = GPUPainter()
     kit = Kit(p)
@@ -114,6 +137,14 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         studio.draw_right(kit, L["right"], ctx, scene, s)
         studio.draw_footer(kit, L["footer"], scene, s)
         studio.draw_live_badge(kit, live, scene, s)
+        ov = os.environ.get("SM_PREVIEW_OVERLAY")
+        if ov:
+            studio.S.overlay = ov
+            studio.S.swap_at = (live.cx, live.cy)
+            if ov == 'LIBRARY':
+                studio.draw_library(kit, L["full"], ctx, s)
+            elif ov == 'SWAPS':
+                studio.draw_swap_popup(kit, L["full"], ctx, s)
         buf = fb.read_color(0, 0, W, H, 4, 0, 'FLOAT')
     import numpy as np
     try:

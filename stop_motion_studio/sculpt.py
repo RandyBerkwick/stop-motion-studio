@@ -186,6 +186,105 @@ def put_positions(ob, kb, positions):
 
 # --------------------------------------------------------------- bridge
 
+# ------------------------------------------------------------ clay brushes
+
+BRUSH_FILE = "brushes/essentials_brushes-mesh_sculpt.blend"
+CLAY_BRUSHES = (            # (what the animator sees, Blender's brush)
+    ("Build up", "Clay Strips"),
+    ("Clay", "Clay"),
+    ("Thumb", "Clay Thumb"),
+    ("Smooth", "Smooth"),
+    ("Push & pull", "Grab"),
+    ("Puff", "Inflate/Deflate"),
+    ("Crease", "Crease Sharp"),
+    ("Flatten", "Flatten/Contrast"),
+)
+
+
+def current_brush(context):
+    try:
+        b = context.tool_settings.sculpt.brush
+        return b.name if b else ""
+    except AttributeError:
+        return ""
+
+
+def set_brush(context, brush_name):
+    """Switch the sculpt brush to one of Blender's own (brush assets in 4.3+)."""
+    try:
+        bpy.ops.brush.asset_activate(asset_library_type='ESSENTIALS', asset_library_identifier="",
+                                     relative_asset_identifier="%s/Brush/%s" % (BRUSH_FILE, brush_name))
+        return True
+    except (RuntimeError, TypeError, AttributeError):
+        pass
+    b = bpy.data.brushes.get(brush_name)          # older Blender: brushes are plain data
+    if b is not None:
+        try:
+            context.tool_settings.sculpt.brush = b
+            return True
+        except (AttributeError, TypeError):
+            pass
+    return False
+
+
+def _ups(context):
+    ts = context.tool_settings
+    ups = getattr(ts.sculpt, "unified_paint_settings", None)      # 5.x
+    return ups if ups is not None else getattr(ts, "unified_paint_settings", None)
+
+
+def brush_size(context):
+    ups = _ups(context)
+    if ups.use_unified_size:
+        return ups.size
+    b = context.tool_settings.sculpt.brush
+    return b.size if b else ups.size
+
+
+def set_brush_size(context, px):
+    ts = context.tool_settings
+    _ups(context).size = int(px)
+    b = ts.sculpt.brush
+    if b is not None:
+        try:
+            b.size = int(px)
+        except AttributeError:
+            pass
+
+
+def brush_strength(context):
+    ups = _ups(context)
+    if ups.use_unified_strength:
+        return ups.strength
+    b = context.tool_settings.sculpt.brush
+    return b.strength if b else ups.strength
+
+
+def set_brush_strength(context, v):
+    ts = context.tool_settings
+    _ups(context).strength = v
+    b = ts.sculpt.brush
+    if b is not None:
+        try:
+            b.strength = v
+        except AttributeError:
+            pass
+
+
+class SM_OT_clay_brush(bpy.types.Operator):
+    """Pick a clay tool for sculpting this shot"""
+    bl_idname = "stop_motion.clay_brush"
+    bl_label = "Clay Tool"
+
+    brush: StringProperty()
+
+    def execute(self, context):
+        if not set_brush(context, self.brush):
+            self.report({'WARNING'}, "Couldn't find the %s brush" % self.brush)
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
+
 class SM_NomadSend(bpy.types.PropertyGroup):
     obj: StringProperty()
     uid: StringProperty()
@@ -316,6 +415,8 @@ class SM_OT_sculpt_shot(bpy.types.Operator):
         ob.select_set(True)
         context.view_layer.objects.active = ob
         bpy.ops.object.mode_set(mode='SCULPT')
+        if current_brush(context) not in {b for _l, b in CLAY_BRUSHES}:
+            set_brush(context, "Clay Strips")   # start with a clay tool
         scene.stop_motion_sculpting = "%s|%s" % (ob.name, uid)
         self.report({'INFO'}, "Sculpting shot %d: only this shot changes" % (idx + 1))
         return {'FINISHED'}
@@ -459,7 +560,7 @@ class SM_OT_open_bridge(bpy.types.Operator):
         return {'FINISHED'}
 
 
-classes = (SM_NomadSend, SM_OT_sculpt_shot, SM_OT_done_sculpting, SM_OT_sculpt_keep,
+classes = (SM_NomadSend, SM_OT_clay_brush, SM_OT_sculpt_shot, SM_OT_done_sculpting, SM_OT_sculpt_keep,
            SM_OT_sculpt_to_swap, SM_OT_remove_sculpt, SM_OT_send_nomad, SM_OT_nomad_back,
            SM_OT_nomad_forget, SM_OT_open_bridge)
 

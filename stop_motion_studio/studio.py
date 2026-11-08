@@ -23,7 +23,7 @@ from bpy.app.handlers import persistent
 from bpy_extras import view3d_utils
 from mathutils import Matrix, Quaternion, Vector
 
-from . import cameras, core, lighting, ops, puppet, sculpt, solid
+from . import cameras, core, library, lighting, ops, puppet, sculpt, solid
 from .studio_kit import Kit, Rect, Theme, studio_layout
 
 PROJECTS_DIR = os.path.join(os.path.expanduser("~"), "Stop Motion")
@@ -90,7 +90,10 @@ class State:
         self.saved_space = None
         self.pending = []             # [(scene name, uid, path)] captures to render
         self.toast = ("", 0.0)
-        self.overlay = None           # None | 'PROJECTS'
+        self.overlay = None           # None | 'PROJECTS' | 'LIBRARY' | 'SWAPS'
+        self.lib_file = None          # the library file picked in the browser
+        self.lib_cache = {}           # path -> (mtime, items)
+        self.swap_at = (0, 0)         # where D was pressed
         self.hold_drag = {}           # shot index -> pixels dragged on its edge
         self.export_kind = 'MOVIE'
         self.export_quality = 'AS_SHOT'
@@ -424,6 +427,10 @@ def draw_studio():
     draw_live_badge(kit, live, scene, s)
     if S.overlay == 'PROJECTS':
         draw_projects(kit, L["full"], s)
+    elif S.overlay == 'LIBRARY':
+        draw_library(kit, L["full"], ctx, s)
+    elif S.overlay == 'SWAPS':
+        draw_swap_popup(kit, L["full"], ctx, s)
     draw_toast(kit, L["full"], s)
 
 
@@ -463,7 +470,8 @@ def draw_top(kit, r, scene, s):
     # right side
     bx = r.right - 16 * s
     for wid, label, cb, w in (("projects", "Projects", lambda: set_overlay('PROJECTS'), 96),
-                              ("save", "Save", save_project, 76)):
+                              ("save", "Save", save_project, 76),
+                              ("library", "Bring in…", lambda: set_overlay('LIBRARY'), 100)):
         bx -= w * s
         kit.button(wid, Rect(bx, r.cy - 17 * s, w * s, 34 * s), label, cb)
         bx -= 8 * s
@@ -789,7 +797,9 @@ def draw_puppet_setup(kit, r, ctx, scene, s):
         label = "Set up again" if ob.stop_motion_puppet.enabled else "Make puppet from " + ob.name
         kit.button("mkpuppet", col.row(40), label, lambda: run(bpy.ops.stop_motion.make_puppet) or redraw(), "accent")
     else:
-        col.note("Pick the puppet's rig on the left.")
+        col.note("Pick the puppet's rig in the live view,")
+        col.note("or bring one in from the library.")
+    kit.button("lib:fromsetup", col.row(34), "Bring in…", lambda: set_overlay('LIBRARY'))
     arm = puppet.puppet_for(ctx)
     if arm is None:
         return
@@ -896,7 +906,23 @@ def draw_sculpt(kit, r, ctx, scene, s):
     col = Column(kit, r, s)
     if scene.stop_motion_sculpting and ctx.mode == 'SCULPT':
         col.title("Sculpting this shot")
-        col.note("Drag on the puppet. Ctrl pushes in, Shift smooths.")
+        col.heading("CLAY TOOLS")
+        current = sculpt.current_brush(ctx)
+        tools = sculpt.CLAY_BRUSHES
+        for start in range(0, len(tools), 2):
+            cells = col.row(36, 5).split_cols(2, 5 * s)
+            for cell, (label, name) in zip(cells, tools[start:start + 2]):
+                kit.button("brush:" + name, cell, label,
+                           (lambda n=name: run(bpy.ops.stop_motion.clay_brush, brush=n) or redraw()),
+                           "clay", selected=(current == name), size=12)
+        col.heading("SIZE")
+        size = sculpt.brush_size(ctx)
+        kit.slider("bsize", col.row(24), (size - 5) / 295.0,
+                   lambda v: sculpt.set_brush_size(bpy.context, 5 + v * 295) or redraw())
+        col.heading("STRENGTH")
+        kit.slider("bstrength", col.row(24), sculpt.brush_strength(ctx),
+                   lambda v: sculpt.set_brush_strength(bpy.context, max(0.02, v)) or redraw())
+        col.note("Ctrl: the other way (in / deflate). Shift: smooth.")
         kit.button("donesculpt", col.row(40), "Done sculpting", lambda: run(bpy.ops.stop_motion.done_sculpting) or redraw(), "accent")
         return
     col.title("Sculpt a shot")
@@ -1128,6 +1154,130 @@ def draw_projects(kit, full, s):
         col.note("Nothing saved yet. Save puts projects here.")
 
 
+def lib_items(path):
+    try:
+        m = os.path.getmtime(path)
+    except OSError:
+        return []
+    hit = S.lib_cache.get(path)
+    if hit is None or hit[0] != m:
+        hit = (m, library.contents(path))
+        S.lib_cache[path] = hit
+    return hit[1]
+
+
+def bring_in(path, item, kind):
+    r = run(bpy.ops.stop_motion.bring_in, path=path, item=item, kind=kind)
+    if r == {'FINISHED'}:
+        S.overlay = None
+        label = os.path.splitext(os.path.basename(path))[0] if item == library.WHOLE_FILE else item
+        toast("%s is in: %s" % (label, {"PUPPET": "drag its rings to pose it", "PROP": "a prop, drag its green ring",
+                                       "SET": "a set piece, arrange it in the Set tab"}[kind if kind != 'AUTO' else 'PROP']))
+        if kind == 'PUPPET':
+            set_mode('ANIMATE')
+    redraw()
+
+
+def add_selection_to_library():
+    ctx = bpy.context
+    if not ctx.selected_objects:
+        toast("Select something first (click it in the live view)")
+        return
+    r = run(bpy.ops.stop_motion.add_to_library)
+    if r == {'FINISHED'}:
+        toast("Saved to the library")
+    redraw()
+
+
+def draw_library(kit, full, ctx, s):
+    t = Theme
+    kit.area("overlay:shade", full, on_click=lambda: set_overlay('LIBRARY'))
+    kit.p.rect(full, (0, 0, 0, 0.55))
+    box = Rect(full.cx - 360 * s, full.cy - 250 * s, 720 * s, 500 * s)
+    kit.area("overlay:box", box)
+    kit.panel(box, t.panel, 14, t.line_strong)
+    inner = box.inset(24 * s, 20 * s)
+    head, body = inner.take_top(64 * s)
+    kit.label(Rect(head.x, head.top - 26 * s, head.w, 26 * s), "Bring in a puppet, prop or set piece", 16, t.text, "left", True)
+    kit.label(Rect(head.x, head.top - 50 * s, head.w, 18 * s), library.LIBRARY_DIR, 11, t.muted)
+    files = library.list_files()
+    left = Rect(body.x, body.y + 52 * s, body.w * 0.42, body.h - 52 * s)
+    right = Rect(left.right + 16 * s, body.y + 52 * s, body.right - left.right - 16 * s, body.h - 52 * s)
+    col = Column(kit, left, s)
+    col.heading("FILES")
+    if not files:
+        col.note("The library is empty.")
+        col.note("Put .blend files of puppets, props and sets")
+        col.note("in the folder, or add what's selected.")
+    for f in files:
+        if not col.room(36):
+            col.note("…more in the folder")
+            break
+        kit.button("lib:" + f, col.row(32, 5), os.path.splitext(f)[0],
+                   (lambda n=f: setattr(S, "lib_file", n) or redraw()), "tab", S.lib_file == f, size=12)
+    col = Column(kit, right, s)
+    if S.lib_file and S.lib_file in files:
+        path = os.path.join(library.LIBRARY_DIR, S.lib_file)
+        items = lib_items(path)
+        col.heading("IN THIS FILE")
+        if not items:
+            col.note("Nothing to bring in from this file.")
+        for name, label in items:
+            if not col.room(44):
+                break
+            row = col.row(34, 6)
+            name_r = Rect(row.x, row.y, row.w - 228 * s, row.h)
+            kit.label(name_r, label, 13, t.text)
+            for k, (kind, text) in enumerate((('PUPPET', "Puppet"), ('PROP', "Prop"), ('SET', "Set"))):
+                b = Rect(row.right - (3 - k) * 76 * s, row.y, 72 * s, row.h)
+                kit.button("bring:%s:%s:%s" % (S.lib_file, name, kind), b, text,
+                           (lambda pth=path, nm=name, kd=kind: bring_in(pth, nm, kd)),
+                           "accent" if kind == 'PUPPET' else "ghost", size=12)
+        col.note("Puppet: a rig, set up with grab rings. Prop: can be moved and held.")
+        col.note("Set: stays put in every shot.")
+    else:
+        col.heading("PICK A FILE")
+        col.note("Its puppets and props are listed here.")
+    foot = Rect(body.x, body.y, body.w, 40 * s)
+    a, b = foot.split_cols(2, 10 * s)
+    kit.button("lib:add", a, "Add what's selected to the library", add_selection_to_library, size=12,
+               enabled=bool(ctx.selected_objects))
+    kit.button("lib:open", b, "Show the library folder", lambda: run(bpy.ops.stop_motion.open_library), size=12)
+
+
+def draw_swap_popup(kit, full, ctx, s):
+    """D: the swap parts of the puppet you're posing, at the mouse."""
+    t = Theme
+    arm = puppet.puppet_for(ctx)
+    kit.area("overlay:shade", full, on_click=lambda: set_overlay('SWAPS'))
+    if arm is None or not arm.stop_motion_puppet.swap_sets:
+        r = Rect(S.swap_at[0] - 120 * s, S.swap_at[1] - 20 * s, 240 * s, 40 * s)
+        kit.area("overlay:box", r)
+        kit.panel(r, t.raised, 10, t.line_strong)
+        kit.label(r, "No swap parts on this puppet", 12, t.muted, "center")
+        return
+    pp = arm.stop_motion_puppet
+    h = (24 + sum(24 + 34 * ((len(ss.items) + 3) // 4) for ss in pp.swap_sets)) * s
+    w = 360 * s
+    x = min(max(full.x + 8 * s, S.swap_at[0] - w / 2), full.right - w - 8 * s)
+    y = min(max(full.y + 8 * s, S.swap_at[1] - h / 2), full.top - h - 8 * s)
+    box = Rect(x, y, w, h)
+    kit.area("overlay:box", box)
+    kit.panel(box, t.panel, 12, t.line_strong)
+    col = Column(kit, box.inset(14 * s, 12 * s), s)
+    for si, sset in enumerate(pp.swap_sets):
+        col.heading(sset.name.upper())
+        active = puppet.swap_active(sset)
+        items = list(sset.items)
+        for start in range(0, len(items), 4):
+            cells = col.row(30, 4).split_cols(4, 5 * s)
+            for k, (cell, it) in enumerate(zip(cells, items[start:start + 4])):
+                ii = start + k
+                kit.button("pswap:%d:%d" % (si, ii), cell, it.label,
+                           (lambda a=si, b=ii: run(bpy.ops.stop_motion.swap, puppet=arm.name, set_index=a, item=b) or redraw()),
+                           "clay", selected=(ii == active), size=12)
+
+
 # ================================================================ studio input
 
 def step(direction):
@@ -1247,6 +1397,9 @@ class SM_OT_studio_loop(bpy.types.Operator):
             play()
         elif t == 'S' and cmd:
             save_project()
+        elif t == 'D' and not cmd and context.mode != 'SCULPT':
+            S.swap_at = (event.mouse_region_x, event.mouse_region_y)
+            set_overlay('SWAPS')
         elif t == 'O' and cmd:
             set_overlay('PROJECTS')
         elif t in ('ONE', 'TWO', 'THREE', 'FOUR', 'FIVE') and not cmd:
