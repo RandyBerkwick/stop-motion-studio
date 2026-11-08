@@ -763,7 +763,7 @@ def draw_puppet(kit, r, ctx, scene, s):
         return
     pp = arm.stop_motion_puppet
     col.title(arm.name)
-    pins = [(i, rg) for i, rg in enumerate(pp.rings) if rg.pin is not None]
+    pins = [(i, rg) for i, rg in enumerate(pp.rings) if puppet.has_pin(rg)]
     if pins:
         cells = col.row(32).split_cols(len(pins), 6 * s)
         for (i, rg), cell in zip(pins, cells):
@@ -853,6 +853,8 @@ def draw_props(kit, r, ctx, scene, s):
                    lambda v: run(bpy.ops.stop_motion.set_piece, on=v) or redraw())
     else:
         kit.button("setpiece", b, "Set piece", lambda: None, enabled=False, size=12)
+    kit.toggle("selfsolid", col.row(30), "Puppets' own parts are solid", sm.self_solid,
+               lambda v: setattr(sm, "self_solid", v) or redraw())
     col.y -= 8 * s
     col.title("Props")
     kit.button("mkprop", col.row(36), "Make selected a prop", lambda: run(bpy.ops.stop_motion.make_prop) or redraw())

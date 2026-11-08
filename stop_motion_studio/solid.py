@@ -34,9 +34,13 @@ MAX_POINTS = 240
 
 # --------------------------------------------------------------- obstacles
 
-def obstacle_tree(scene, depsgraph, exclude):
-    """One BVH of every solid, visible mesh not in `exclude`, in world space."""
+def obstacle_tree(scene, depsgraph, exclude, extra=None):
+    """One BVH of every solid, visible mesh not in `exclude`, in world space.
+    `extra` = (verts, polys) added as well (a puppet's own other parts)."""
     verts, polys = [], []
+    if extra is not None:
+        verts.extend(extra[0])
+        polys.extend(extra[1])
     for ob in scene.objects:
         if ob.type != 'MESH' or ob in exclude or not ob.visible_get():
             continue
@@ -194,6 +198,82 @@ def object_points(context, ob):
 
 def own_meshes(scene, arm):
     return set(puppet.puppet_meshes(arm, scene))
+
+
+def self_geometry(context, arm, moving_bone, near=2):
+    """The puppet's own parts that a move of `moving_bone` should bump into.
+
+    Left out: what moves with it, and the `near` bones above it (the joint it
+    turns at always touches those)."""
+    if not getattr(context.scene.stop_motion, "self_solid", True) or moving_bone not in arm.data.bones:
+        return None
+    skip = _subtree(arm, moving_bone)
+    b = arm.data.bones[moving_bone].parent
+    for _ in range(near):
+        if b is None:
+            break
+        skip.add(b.name)
+        b = b.parent
+    # bones an IK chain bends toward what's moving go with it (IK hands and feet)
+    moving = set(skip)
+    for pb in arm.pose.bones:
+        for c in pb.constraints:
+            if c.type == 'IK' and c.influence > 0.0 and c.target == arm and c.subtarget in moving:
+                chain, x = [], pb
+                while x is not None and len(chain) < (c.chain_count or 99):
+                    chain.append(x.name)
+                    x = x.parent
+                for name in chain:
+                    skip |= _subtree(arm, name)
+                if x is not None:
+                    skip.add(x.name)     # the joint the chain hangs from
+    dg = context.evaluated_depsgraph_get()
+    verts, polys = [], []
+    for ob in puppet.puppet_meshes(arm, context.scene):
+        if not ob.visible_get() or not getattr(ob, "stop_motion_solid", True):
+            continue
+        if ob.parent_type == 'BONE' and ob.parent == arm:
+            if ob.parent_bone in skip:
+                continue
+            keep_vertex = None
+        else:
+            names = {g.index: g.name for g in ob.vertex_groups}
+            keep_vertex = []
+            for v in ob.data.vertices:
+                g = max(v.groups, key=lambda e: e.weight) if v.groups else None
+                keep_vertex.append(g is not None and names.get(g.group) not in skip)
+        oe = ob.evaluated_get(dg)
+        me = oe.to_mesh()
+        try:
+            if keep_vertex is not None and len(me.vertices) != len(keep_vertex):
+                continue            # modifiers changed the mesh: can't tell parts apart
+            base = len(verts)
+            mw = oe.matrix_world
+            verts.extend(mw @ v.co for v in me.vertices)
+            for p in me.polygons:
+                if keep_vertex is None or all(keep_vertex[i] for i in p.vertices):
+                    polys.append(tuple(base + i for i in p.vertices))
+        finally:
+            oe.to_mesh_clear()
+    if not polys:
+        return None
+    return verts, polys
+
+
+def set_world(context, ob, world, hand=None):
+    """Put `ob` at `world`. A prop held in a hand stays held (its own transform is fitted)."""
+    c = held_by(ob)
+    if c is None:
+        ob.matrix_world = world
+        return
+    if hand is None:
+        hand = bone_world(context, c.target, c.subtarget)
+    ob.matrix_basis = c.inverse_matrix.inverted() @ hand.inverted() @ world
+
+
+def _holding_puppet(ob):
+    c = held_by(ob)
+    return c.target if c is not None else None
 
 
 # ------------------------------------------------------------------- props
@@ -478,6 +558,8 @@ class SM_OT_solid_drag(bpy.types.Operator):
         dg = context.evaluated_depsgraph_get()
         self.target_ob = None
         self.target_bone = None
+        extra = None
+        self.hand = None
         if self.prop:
             ob = bpy.data.objects.get(self.prop)
             if ob is None:
@@ -487,6 +569,11 @@ class SM_OT_solid_drag(bpy.types.Operator):
             self.anchor = self.start.translation.copy()
             self.points = object_points(context, ob)
             exclude = {ob} | set(ob.children_recursive)
+            holder = _holding_puppet(ob)
+            if holder is not None:     # in a hand: the hand it's in doesn't count as in the way
+                c = held_by(ob)
+                self.hand = bone_world(context, c.target, c.subtarget)
+                exclude |= own_meshes(scene, holder)
         else:
             arm = bpy.data.objects.get(self.puppet)
             if arm is None or not (0 <= self.ring < len(arm.stop_motion_puppet.rings)):
@@ -494,6 +581,8 @@ class SM_OT_solid_drag(bpy.types.Operator):
             ring = arm.stop_motion_puppet.rings[self.ring]
             self.arm = arm
             exclude = own_meshes(scene, arm)
+            if self.solid_on(scene):
+                extra = self_geometry(context, arm, ring.bone)
             if ring.pin is not None and puppet.is_pinned(arm, ring):
                 self.target_ob = ring.pin
                 self.anchor = ring.pin.matrix_world.translation.copy()
@@ -506,13 +595,28 @@ class SM_OT_solid_drag(bpy.types.Operator):
                 self.start = pb.matrix.copy()
                 self.to_pose = arm.matrix_world.to_3x3().inverted()
                 self.points = ring_points(context, arm, ring, ring.bone)
-        self.solid = scene.stop_motion.solid_world
-        self.tree = obstacle_tree(scene, dg, exclude) if self.solid else None
+        self.solid = self.solid_on(scene)
+        self.tree = obstacle_tree(scene, dg, exclude, extra) if self.solid else None
         return True
+
+    @staticmethod
+    def solid_on(scene):
+        return scene.stop_motion.solid_world
+
+    def _own_axes(self):
+        """The part's own X/Y/Z in world space (for X X: along its own axis)."""
+        if self.target_ob is not None:
+            m = self.start.to_3x3()
+        else:
+            m = self.arm.matrix_world.to_3x3() @ self.start.to_3x3()
+        return {k: m.col[i].normalized() for i, k in enumerate("XYZ")}
+
+    def _axis_vec(self):
+        return self._own_axes()[self.lock] if getattr(self, "local", False) else AXES[self.lock]
 
     def _apply(self, move):
         if self.target_ob is not None:
-            self.target_ob.matrix_world = Matrix.Translation(move) @ self.start
+            set_world(bpy.context, self.target_ob, Matrix.Translation(move) @ self.start, self.hand)
         else:
             m = self.start.copy()
             m.translation = m.translation + self.to_pose @ move
@@ -534,7 +638,7 @@ class SM_OT_solid_drag(bpy.types.Operator):
         """The move the mouse asks for, from the drag's start."""
         origin = self.anchor + self.base
         if self.lock:
-            axis = AXES[self.lock]
+            axis = self._axis_vec()
             _r, _u, back, _e = view_frame(self.rv3d)
             facing = axis.dot(back)
             if abs(facing) > 0.6:
@@ -571,6 +675,7 @@ class SM_OT_solid_drag(bpy.types.Operator):
         self.move = Vector((0.0, 0.0, 0.0))
         self.depth = 0.0
         self.lock = None
+        self.local = False
         context.window_manager.modal_handler_add(self)
         context.window.cursor_modal_set('HAND')
         self._hint(context, False)
@@ -579,8 +684,10 @@ class SM_OT_solid_drag(bpy.types.Operator):
     def _hint(self, context, blocked):
         if blocked:
             _say(context, "Touching something solid · Ctrl to pass through")
+        elif self.lock and self.local:
+            _say(context, "Moving along its own %s · %s again: free" % (self.lock, self.lock))
         elif self.lock:
-            _say(context, "Moving %s only · %s again: free" % (AXIS_WORDS[self.lock], self.lock))
+            _say(context, "Moving %s only · %s again: its own %s" % (AXIS_WORDS[self.lock], self.lock, self.lock))
         else:
             _say(context, "Drag · Shift or wheel: further / nearer · X Y Z: one direction · Esc: cancel")
 
@@ -602,7 +709,7 @@ class SM_OT_solid_drag(bpy.types.Operator):
             self._apply(Vector((0, 0, 0)))
             return {'CANCELLED'}
         if self.solid and self.target_ob is not None and is_prop(self.target_ob) and \
-                getattr(self.target_ob, "stop_motion_falls", True):
+                getattr(self.target_ob, "stop_motion_falls", True) and held_by(self.target_ob) is None:
             drop_to_surface(context, self.target_ob)
         return {'FINISHED'}
 
@@ -625,9 +732,15 @@ class SM_OT_solid_drag(bpy.types.Operator):
         key = _axis_key(event)
         if key:
             self._rebase()
-            self.lock = None if self.lock == key else key
+            # X: along the world's X; X again: along its own X; again: free
+            if self.lock == key and not self.local:
+                self.local = True
+            elif self.lock == key:
+                self.lock, self.local = None, False
+            else:
+                self.lock, self.local = key, False
             if self.lock:
-                show_guide(self.anchor + self.base, self.lock)
+                show_guide(self.anchor + self.base, self.lock, self._axis_vec())
             else:
                 hide_guide()
             self._update(context, event)
@@ -658,6 +771,8 @@ class SM_OT_solid_twist(bpy.types.Operator):
         dg = context.evaluated_depsgraph_get()
         self.ob = None
         self.pb = None
+        self.hand = None
+        extra = None
         if self.prop:
             ob = bpy.data.objects.get(self.prop)
             if ob is None:
@@ -667,6 +782,11 @@ class SM_OT_solid_twist(bpy.types.Operator):
             pts = object_points(context, ob)
             self.pivot = (sum(pts, Vector((0, 0, 0))) / len(pts)) if pts else self.start.translation.copy()
             exclude = {ob} | set(ob.children_recursive)
+            holder = _holding_puppet(ob)
+            if holder is not None:
+                c = held_by(ob)
+                self.hand = bone_world(context, c.target, c.subtarget)
+                exclude |= own_meshes(scene, holder)
         else:
             arm = bpy.data.objects.get(self.puppet)
             if arm is None or not (0 <= self.ring < len(arm.stop_motion_puppet.rings)):
@@ -680,15 +800,17 @@ class SM_OT_solid_twist(bpy.types.Operator):
             self.pivot = arm.matrix_world @ pb.head
             pts = ring_points(context, arm, ring, ring.bone, exclude_pinned=(ring.pin is None))
             exclude = own_meshes(scene, arm)
+            if scene.stop_motion.solid_world:
+                extra = self_geometry(context, arm, ring.bone)
         self.points = pts
         self.solid = scene.stop_motion.solid_world
-        self.tree = obstacle_tree(scene, dg, exclude) if self.solid else None
+        self.tree = obstacle_tree(scene, dg, exclude, extra) if self.solid else None
         return True
 
     def _apply(self, q):
         R = Matrix.Translation(self.pivot) @ q.to_matrix().to_4x4() @ Matrix.Translation(-self.pivot)
         if self.ob is not None:
-            self.ob.matrix_world = R @ self.start
+            set_world(bpy.context, self.ob, R @ self.start, self.hand)
         else:
             mw = self.arm.matrix_world
             self.pb.matrix = mw.inverted() @ R @ mw @ self.start
@@ -700,6 +822,12 @@ class SM_OT_solid_twist(bpy.types.Operator):
     def _axis(self):
         if self.mode == 'VIEW':
             return view_frame(self.rv3d)[2]
+        if getattr(self, "local", False):
+            if self.ob is not None:
+                m = self.start.to_3x3()
+            else:
+                m = self.arm.matrix_world.to_3x3() @ self.start.to_3x3()
+            return m.col["XYZ".index(self.mode)].normalized()
         return AXES[self.mode]
 
     def turn_for(self, delta, m, fine):
@@ -746,6 +874,7 @@ class SM_OT_solid_twist(bpy.types.Operator):
         self.last_screen = self._screen_angle(m)
         self.q = Quaternion()     # the turn so far (allowed)
         self.mode = 'BALL'
+        self.local = False
         context.window_manager.modal_handler_add(self)
         context.window.cursor_modal_set('SCROLL_XY')
         self._hint(context, False)
@@ -756,8 +885,12 @@ class SM_OT_solid_twist(bpy.types.Operator):
             _say(context, "Touching something solid · Ctrl to pass through")
         elif self.mode == 'BALL':
             _say(context, "Turn like a ball · X Y Z: one axis · V: around the view · Shift: fine · Esc: cancel")
+        elif self.local:
+            _say(context, "Turning around its own %s · %s again: free" % (self.mode, self.mode))
+        elif self.mode in AXES:
+            _say(context, "Turning %s · %s again: its own %s" % (AXIS_WORDS[self.mode], self.mode, self.mode))
         else:
-            _say(context, "Turning %s · %s again: free" % (AXIS_WORDS[self.mode], self.mode[0]))
+            _say(context, "Turning %s · V again: free" % AXIS_WORDS[self.mode])
 
     def _finish(self, context, cancel):
         from mathutils import Quaternion
@@ -790,7 +923,12 @@ class SM_OT_solid_twist(bpy.types.Operator):
             return {'RUNNING_MODAL'}
         key = _axis_key(event) or ('VIEW' if event.type == 'V' and event.value == 'PRESS' else None)
         if key:
-            self.mode = 'BALL' if self.mode == key else key
+            if self.mode == key and key in AXES and not self.local:
+                self.local = True            # X again: its own X
+            elif self.mode == key:
+                self.mode, self.local = 'BALL', False
+            else:
+                self.mode, self.local = key, False
             if self.mode == 'BALL':
                 hide_guide()
             else:
@@ -918,13 +1056,7 @@ class SM_OT_grab_prop(bpy.types.Operator):
             o.select_set(False)
         ob.select_set(True)
         context.view_layer.objects.active = ob
-        if held_by(ob) is not None:
-            # in a hand: Blender's own tools move it relative to the hand
-            if event.alt:
-                bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
-            else:
-                bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
-        elif event.alt:
+        if event.alt:
             bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', prop=ob.name)
         else:
             bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', prop=ob.name)

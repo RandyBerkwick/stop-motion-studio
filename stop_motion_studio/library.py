@@ -139,7 +139,7 @@ def add_to_library(context, objects, name):
         keep.update(ob.children_recursive)
         pp = getattr(ob, "stop_motion_puppet", None)
         if pp is not None and pp.enabled:
-            keep.update(r.pin for r in pp.rings if r.pin is not None)   # foot pins live beside the rig
+            keep.update(o for r in pp.rings for o in (r.pin, r.knee) if o is not None)   # foot pins live beside the rig
     folder = library_dir()
     base = "".join(ch for ch in name if ch not in '/\\:*?"<>|').strip() or "Thing"
     path = os.path.join(folder, base + ".blend")

@@ -13,6 +13,7 @@
 import re
 
 import bpy
+from mathutils import Matrix, Vector
 from bpy.props import (BoolProperty, CollectionProperty, EnumProperty,
                        FloatProperty, IntProperty, PointerProperty, StringProperty)
 
@@ -38,6 +39,8 @@ class SM_Ring(bpy.types.PropertyGroup):
     bone: StringProperty()
     pin: PointerProperty(type=bpy.types.Object, description="Pin the ring moves, if any")
     pin_owner: StringProperty(description="Bone carrying the pin's IK")
+    rig_ik: StringProperty(description="The rig's own IK constraint used as this ring's pin (rigs with IK feet)")
+    knee: PointerProperty(type=bpy.types.Object, description="Where the knee points")
     size: FloatProperty(name="Ring size", min=0.2, max=4.0, default=1.0)
 
 
@@ -258,11 +261,119 @@ def add_foot_pin(scene, arm, foot_name):
     return empty, owner.name
 
 
+def _signed_angle(u, v, normal):
+    a = u.angle(v)
+    if u.cross(v).dot(normal) > 0:
+        a = -a
+    return a
+
+
+def pole_angle(upper, lower, pole_location):
+    """IK pole angle that keeps a two-bone chain bent the way it is now
+    (armature space)."""
+    root = upper.head
+    pole_normal = (lower.tail - root).cross(pole_location - root)
+    projected = pole_normal.cross(upper.tail - root)
+    x_axis = upper.matrix.to_3x3().col[0]
+    return _signed_angle(x_axis, projected, upper.tail - root)
+
+
+def add_knee(context, arm, ring):
+    """A knee target for a pinned leg, so the knee keeps pointing the same way
+    on big poses instead of flipping. It follows the foot's pin."""
+    c = pin_constraint(arm, ring)
+    if c is None or ring.pin is None or c.pole_target is not None or ring.rig_ik:
+        return None
+    owner = arm.pose.bones[ring.pin_owner]
+    upper = owner.parent
+    if upper is None:
+        return None
+    context.view_layer.update()
+    hip, knee, ankle = upper.head, owner.head, owner.tail
+    mid = (hip + ankle) / 2
+    bend = knee - mid
+    leg = (ankle - hip).length
+    if bend.length < leg * 0.02:
+        # straight leg: knees point the way the puppet faces (-Y, Blender's front)
+        bend = Vector((0, -1, 0))
+        bend = bend - (ankle - hip).normalized() * bend.dot((ankle - hip).normalized())
+    pole_pos = knee + bend.normalized() * leg * 0.6
+    empty = bpy.data.objects.new("Knee %s" % ring.bone, None)
+    empty.empty_display_type = 'CONE'
+    empty.empty_display_size = max(0.015, leg * 0.06)
+    empty.hide_render = True
+    empty.hide_viewport = True             # animators steer knees with the foot, not this
+    for col in (ring.pin.users_collection or arm.users_collection):
+        col.objects.link(empty)
+        break
+    else:
+        context.scene.collection.objects.link(empty)
+    empty.matrix_world = arm.matrix_world @ Matrix.Translation(pole_pos)
+    # follow the foot pin (keep where it is now)
+    empty.parent = ring.pin
+    empty.matrix_parent_inverse = ring.pin.matrix_world.inverted()
+    want = [(b, (arm.matrix_world @ b.matrix).copy()) for b in (upper, owner)]
+    c.pole_target = empty
+    c.pole_angle = pole_angle(upper, owner, pole_pos)
+    ring.knee = empty
+    _settle_pole(context, arm, c, want)
+    return empty
+
+
+def _settle_pole(context, arm, c, want, tol=1e-4):
+    """Make sure the knee target didn't turn the leg (rigs differ in bone roll):
+    nudge the pole angle until the leg is back where it was."""
+    import math
+
+    def err(angle):
+        c.pole_angle = angle
+        context.view_layer.update()
+        ae = arm.evaluated_get(context.evaluated_depsgraph_get())
+        total = 0.0
+        for b, m in want:
+            now = ae.matrix_world @ ae.pose.bones[b.name].matrix
+            total += sum((now.col[i].xyz - m.col[i].xyz).length for i in range(3))
+        return total
+
+    best = c.pole_angle
+    e = err(best)
+    if e > tol:
+        for k in range(36):                       # coarse search all the way round
+            a = -math.pi + k * math.pi / 18
+            ea = err(a)
+            if ea < e:
+                best, e = a, ea
+        step = math.pi / 36
+        while step > 1e-4 and e > tol:            # then home in
+            for a in (best - step, best + step):
+                ea = err(a)
+                if ea < e:
+                    best, e = a, ea
+                    break
+            else:
+                step /= 2
+    c.pole_angle = best
+    context.view_layer.update()
+
+
+def find_rig_ik(arm, bone):
+    """A rig's own IK constraint aimed at `bone` (an IK foot control). (owner bone, constraint) or None."""
+    for pb in arm.pose.bones:
+        for c in pb.constraints:
+            if c.type == 'IK' and c.name != PIN_CONSTRAINT and c.target == arm and c.subtarget == bone:
+                return pb, c
+    return None
+
+
 def pin_constraint(arm, ring):
     owner = arm.pose.bones.get(ring.pin_owner) if ring.pin_owner else None
     if owner is None:
         return None
-    return owner.constraints.get(PIN_CONSTRAINT)
+    return owner.constraints.get(ring.rig_ik or PIN_CONSTRAINT)
+
+
+def has_pin(ring):
+    return ring.pin is not None or bool(ring.rig_ik)
 
 
 def is_pinned(arm, ring):
@@ -270,12 +381,38 @@ def is_pinned(arm, ring):
     return c is not None and c.influence > 0.5
 
 
+def _ik_chain(owner, c):
+    chain, b = [], owner
+    n = c.chain_count or 99
+    while b is not None and len(chain) < n:
+        chain.append(b)
+        b = b.parent
+    return list(reversed(chain))
+
+
 def set_pinned(context, arm, ring, pinned):
     """Switch a pin without the foot jumping."""
     c = pin_constraint(arm, ring)
-    if c is None or ring.pin is None:
+    if c is None or not has_pin(ring):
         return
     owner = arm.pose.bones[ring.pin_owner]
+    if ring.rig_ik:
+        # the rig's own IK: the foot control is where the foot goes
+        context.view_layer.update()
+        if pinned:
+            ctrl = arm.pose.bones.get(ring.bone)
+            if ctrl is not None:
+                m = ctrl.matrix.copy()
+                m.translation = owner.tail.copy()
+                ctrl.matrix = m
+            c.influence = 1.0
+        else:
+            mats = [(b, b.matrix.copy()) for b in _ik_chain(owner, c)]
+            c.influence = 0.0
+            for pb, m in mats:
+                pb.matrix = m
+                context.view_layer.update()
+        return
     upper = owner.parent
     if pinned:
         context.view_layer.update()
@@ -302,10 +439,16 @@ def make_puppet(context, arm, pin_feet=True):
         r = pp.rings.add()
         r.label = label
         r.bone = bone
-        if pin_feet and "foot" in label.lower() and "ik" not in bone.lower():
-            res = add_foot_pin(scene, arm, bone)
-            if res:
-                r.pin, r.pin_owner = res
+        if pin_feet and "foot" in label.lower():
+            rig = find_rig_ik(arm, bone)
+            if rig is not None:
+                # the rig already has IK feet: use its IK as the pin
+                r.pin_owner, r.rig_ik = rig[0].name, rig[1].name
+            elif "ik" not in bone.lower():
+                res = add_foot_pin(scene, arm, bone)
+                if res:
+                    r.pin, r.pin_owner = res
+                    add_knee(context, arm, r)
     rescan_swaps(context, arm)
     return pp
 
@@ -361,7 +504,7 @@ class SM_OT_make_puppet(bpy.types.Operator):
         if context.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT')
         pp = make_puppet(context, arm, self.pin_feet)
-        pins = sum(1 for r in pp.rings if r.pin)
+        pins = sum(1 for r in pp.rings if has_pin(r))
         self.report({'INFO'}, "%s: %d rings, %d swap sets, %d pins" %
                     (arm.name, len(pp.rings), len(pp.swap_sets), pins))
         for area in context.screen.areas:
@@ -442,8 +585,10 @@ class SM_OT_unpuppet(bpy.types.Operator):
         pp = arm.stop_motion_puppet
         for r in pp.rings:
             c = pin_constraint(arm, r)
-            if c is not None:
+            if c is not None and not r.rig_ik:
                 arm.pose.bones[r.pin_owner].constraints.remove(c)
+            if r.knee is not None:
+                bpy.data.objects.remove(r.knee)
             if r.pin is not None:
                 bpy.data.objects.remove(r.pin)
         pp.rings.clear()

@@ -163,6 +163,28 @@ def is_animated(ob):
     return ad is not None and ad.action is not None
 
 
+def slide_check(context, d, new, surf):
+    """Sliding along the same surface, a thing stops at whatever stands on it
+    (it doesn't pass through a vase on the table). Moving onto another
+    object is a lift: it goes straight there."""
+    last = d.get("last")
+    bumped = False
+    if last is not None and d.get("surf") == surf:
+        key = surf.name
+        tree = d["trees"].get(key)
+        if tree is None:
+            tree = solid.obstacle_tree(context.scene, context.evaluated_depsgraph_get(), d["exclude"] | {surf})
+            d["trees"][key] = tree
+        if tree is not None:
+            move = new.translation - last.translation
+            pts = [last @ p for p in d["pts"]]
+            allowed, bumped = solid.solve(pts, move, tree)
+            if bumped:
+                new = Matrix.Translation(allowed - move) @ new
+    d["last"], d["surf"] = new.copy(), surf
+    return new, bumped
+
+
 # ------------------------------------------------------------------ stamping
 
 def stamp(context, source, hit, normal, align, rng=None, vary=0.15, tree=None):
@@ -265,6 +287,7 @@ class SM_OT_arrange(bpy.types.Operator):
             "n0": surface_frame(scene, dg, ob, world, exclude),
             "tree": solid.obstacle_tree(scene, dg, exclude),
             "spin": 0.0, "anchor": ob.matrix_world.translation.copy(),
+            "last": None, "surf": None, "trees": {},
         }
         for o in context.selected_objects:
             o.select_set(False)
@@ -282,8 +305,12 @@ class SM_OT_arrange(bpy.types.Operator):
         hit = self._hit(context, m, d["exclude"])
         if hit is None:
             return
-        loc, normal, _ob = hit
-        d["ob"].matrix_world = placement(d["start"], d["pts"], loc, normal, align, d["spin"], d["n0"], d["tree"])
+        loc, normal, surf = hit
+        new = placement(d["start"], d["pts"], loc, normal, align, d["spin"], d["n0"], d["tree"])
+        new, bumped = slide_check(context, d, new, surf)
+        d["ob"].matrix_world = new
+        if bumped:
+            self._say(context, "Bumped into something · move the mouse onto it to put it on top")
 
     def _finish_drag(self, context, cancel=False):
         d = self.drag

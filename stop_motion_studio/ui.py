@@ -110,7 +110,7 @@ class SM_PT_puppet(bpy.types.Panel):
         pp = arm.stop_motion_puppet
         layout.label(text=arm.name, icon='OUTLINER_OB_ARMATURE')
 
-        pins = [(i, r) for i, r in enumerate(pp.rings) if r.pin is not None]
+        pins = [(i, r) for i, r in enumerate(pp.rings) if puppet.has_pin(r)]
         if pins:
             row = layout.row(align=True)
             for i, r in pins:
@@ -166,6 +166,7 @@ class SM_PT_props(bpy.types.Panel):
                     icon='MOD_PHYSICS' if scene.stop_motion.solid_world else 'GHOST_DISABLED')
         if scene.stop_motion.solid_world:
             layout.label(text="Dragged parts stop at surfaces · Ctrl passes through")
+            layout.prop(scene.stop_motion, "self_solid")
         ob = context.active_object
         if ob is not None and ob.type == 'MESH':
             row = layout.row(align=True)

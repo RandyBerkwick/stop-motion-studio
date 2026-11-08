@@ -87,6 +87,8 @@ class SM_Settings(bpy.types.PropertyGroup):
                               description="How much each stamped copy's size varies")
     solid_world: BoolProperty(name="Solid world", default=True,
                               description="Dragged parts and props stop at surfaces instead of passing through")
+    self_solid: BoolProperty(name="Own parts are solid", default=True,
+                             description="A puppet's hand stops at its own body, its feet at each other")
 
 
 classes = (SM_Shot, SM_Settings)

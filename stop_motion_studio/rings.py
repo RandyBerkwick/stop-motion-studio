@@ -181,7 +181,7 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
             gz.hide = not _inside(region, rv3d, pos, box)
             gz.matrix_basis = Matrix.Translation(pos) @ view_rot
             gz.scale_basis = 0.22 * ring.size
-            gz.color = PIN_COLOR if (ring.pin is not None and puppet.is_pinned(arm, ring)) else RING_COLOR
+            gz.color = PIN_COLOR if (puppet.has_pin(ring) and puppet.is_pinned(arm, ring)) else RING_COLOR
 
 
 classes = (SM_OT_grab_ring, SM_GGT_rings)

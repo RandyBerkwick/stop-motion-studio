@@ -265,6 +265,14 @@ def key_pose(scene, frame, objects):
             if c is not None:
                 c.keyframe_insert("influence", frame=frame)
                 touched.add(arm)
+        for r in arm.stop_motion_puppet.rings:      # rigs with their own IK feet
+            c = _puppet.pin_constraint(arm, r) if r.rig_ik else None
+            if c is not None:
+                try:
+                    c.keyframe_insert("influence", frame=frame)
+                    touched.add(arm)
+                except (TypeError, RuntimeError):
+                    pass                            # driven by the rig: leave it
     # Props held in a hand: which hand (if any) is part of the shot.
     for ob in scene.objects:
         for c in ob.constraints:

@@ -56,7 +56,7 @@ def px(pt):
 anchor = Vector((0.3, 0, 0.5))
 m0 = px(anchor)
 drag = fake(solid.SM_OT_solid_drag, region=region, rv3d=rv3d, anchor=anchor,
-            base=Vector((0, 0, 0)), move=Vector((0, 0, 0)), press=m0.copy(), eff=m0.copy(), depth=0.0, lock=None)
+            base=Vector((0, 0, 0)), move=Vector((0, 0, 0)), press=m0.copy(), eff=m0.copy(), depth=0.0, lock=None, local=False)
 
 assert drag.wanted().length < 1e-6, "no mouse movement, no move"
 drag.eff = m0 + Vector((80, 0))
@@ -172,7 +172,7 @@ def ev(type, value='NOTHING', x=0, y=0, shift=False, ctrl=False):
     return SimpleNamespace(type=type, value=value, mouse_region_x=x, mouse_region_y=y,
                            shift=shift, ctrl=ctrl, alt=False, oskey=False)
 d = fake(solid.SM_OT_solid_drag, region=region, rv3d=rv3d, anchor=anchor.copy(), start=box.matrix_world.copy(),
-         target_ob=box, target_bone=None, points=[], tree=None, solid=False,
+         target_ob=box, target_bone=None, points=[], tree=None, solid=False, hand=None, local=False,
          base=Vector((0, 0, 0)), move=Vector((0, 0, 0)), press=m0.copy(), eff=m0.copy(), last=m0.copy(), depth=0.0, lock=None)
 d.modal(ctx, ev('MOUSEMOVE', x=m0.x + 50, y=m0.y))
 x_after = box.matrix_world.translation.x
@@ -188,13 +188,15 @@ d.modal(ctx, ev('MOUSEMOVE', x=m0.x + 50, y=m0.y + 140))
 now = box.matrix_world.translation
 assert now.z > here.z + 0.05 and abs(now.x - here.x) < 1e-5 and abs(now.y - here.y) < 1e-5, (here, now)
 d.modal(ctx, ev('Z', 'PRESS'))
+assert d.lock == 'Z' and d.local, "Z again: its own Z"
+d.modal(ctx, ev('Z', 'PRESS'))
 assert d.lock is None and solid._GUIDE["origin"] is None
 r = d.modal(ctx, ev('ESC', 'PRESS'))
 assert r == {'CANCELLED'} and close(box.matrix_world.translation, anchor), "Esc puts it back"
 print("drag events ok")
 
 t = fake(solid.SM_OT_solid_twist, region=region, rv3d=rv3d, pivot=anchor.copy(), pivot2d=m0.copy(),
-         start=box.matrix_world.copy(), ob=box, pb=None, points=[], tree=None, solid=False,
+         start=box.matrix_world.copy(), ob=box, pb=None, points=[], tree=None, solid=False, hand=None, local=False,
          last=m0.copy(), last_screen=0.0, q=Quaternion(), mode='BALL')
 t.modal(ctx, ev('MOUSEMOVE', x=m0.x + 60, y=m0.y + 30))
 assert box.matrix_world.to_quaternion().angle > 0.3, "ball turn turns it"
@@ -204,8 +206,10 @@ q_before = t.q.copy()
 t.modal(ctx, ev('MOUSEMOVE', x=m0.x + 60, y=m0.y + 90))
 extra = t.q @ q_before.inverted()
 assert extra.angle > 0.1 and abs(abs(extra.axis.x) - 1) < 1e-3, extra.axis
+t.modal(ctx, ev('X', 'PRESS'))
+assert t.mode == 'X' and t.local, "X again: around its own X"
 t.modal(ctx, ev('V', 'PRESS'))
-assert t.mode == 'VIEW'
+assert t.mode == 'VIEW' and not t.local
 t.modal(ctx, ev('V', 'PRESS'))
 assert t.mode == 'BALL'
 r = t.modal(ctx, ev('LEFTMOUSE', 'RELEASE'))
