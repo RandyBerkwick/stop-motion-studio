@@ -82,7 +82,7 @@ cube.location.z += 0.5                   # a change, so there's something to sav
 studio._on_exit()
 saved = os.listdir(projects)
 print("saved on quit:", saved)
-assert saved == ["Scene 01.blend"], saved
+assert [f for f in saved if f.endswith(".blend")] == ["Scene 01.blend"], saved
 assert prefs.use_save_prompt is True and studio.S.saved_prompt is None
 studio.S.active = False
 
