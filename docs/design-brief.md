@@ -35,10 +35,10 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 2. Puppet component: rings, swap sets, pin feet. **0.2.0 hand-tested OK on Mac; merged.**
 3. Cameras & light: camera setups + locks, saved views, presets, light per shot. **0.3.0 hand-tested OK on Mac; merged.**
 4. Solid world: collision-aware drag tool, drop to surface. **0.4.0 hand-tested OK on Mac; merged.**
-5. Sculpt: per-shot sculpt, Nomad bridge. **0.5.0 built; logic and file round trip tested headless.**
-6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 launcher working on Mac.**
-7. Arranging the set: slide and stick on surfaces, stamp copies, set pieces. **0.7.0 built on branch arrange; tested headless and rendered.**
-8. Solid twist: turning parts and props stops where they'd touch something. **0.8.0 built on branch solid-twist; tested headless.**
+5. Sculpt: per-shot sculpt, Nomad bridge. **0.5.0 built; logic and file round trip tested headless; merged.**
+6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 launcher working on Mac; merged.**
+7. Arranging the set: slide and stick on surfaces, stamp copies, set pieces. **0.7.0 tested headless and rendered; merged.**
+8. Solid twist: turning parts and props stops where they'd touch something. **0.8.0 tested headless; merged.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
