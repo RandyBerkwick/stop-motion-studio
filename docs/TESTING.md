@@ -21,6 +21,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Nomad bridge: Send writes an OBJ (Y-up, exact round trip); the folder watcher spots the re-exported file and puts the sculpt on that shot; same vertex count is matched point for point, a reordered or triangulated mesh is fitted to the surface.
 - Studio: layout (live box centred, panels tile the window), widget clicks, drags, sliders, wheel, hold handles; shot pictures rendered off-screen and saved; free-view picture renders; drag-to-hold changes holds a frame per card width, never below 1; a failed start rolls back so Blender is never left half-hidden. Screens rendered off-screen and checked by eye.
 - Arrange: rays skip the dragged object and anything not solid; a cup slid onto the floor sits on it upright; a flower stuck to the side of a lumpy bush leans out along the surface (or stays upright) and nothing is left inside the bush; 21 stamped flowers are linked copies with varied size and spin, none buried; set pieces aren't keyed, moving one sticks in every shot, Make Set Piece clears old keys without moving it. Rendered and checked by eye.
+- Solid twist: a stick tipped over on its edge stops flat on the floor (90°); a box turned beside a wall stops when its corner meets it; Bramble's arm swung down stops when the hand meets the table (the other way is free); turning back out of contact is always free; nothing ends up inside.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -88,6 +89,12 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 50. Shoot a few shots, then drag a stamped flower: it moves in every shot (set piece). Make the table a set piece, move it: same. Click Set piece: off on something to put it back in the shots.
 51. Tell me how dragging feels on heavy meshes (the bush), and whether the lean is right on your real set pieces.
 
+## Solid twist (0.8.0)
+52. Solid world on. Alt+drag a hand ring and swing the arm down into the table: it stops on the table top. Turn back: free. Ctrl: passes through. Shift: fine turning. Esc: back where it was.
+53. Drag the head ring (heads twist on a plain drag) round into the wall or another puppet: it stops.
+54. Alt+drag the mug's ring to tip it: it stops against the table or wall; let go and a tipped mug settles back onto its surface.
+55. Arranging: wheel-spinning a prop next to a wall never pushes it into the wall.
+
 ## Known gaps
 - In normal Blender the shot cards are still a grid in the sidebar (the Studio has the strip).
 - Studio: no file browser for bringing in a puppet yet (use the hidden way back); swap pop-up (D) not in the Studio; sculpt brushes are Blender's default brush.
@@ -95,7 +102,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - The Mac launcher still shows Blender's icon in the Dock.
 - Switching the filming camera isn't part of the shots yet (it's for checking angles).
 - The ghost comes from whichever camera took each shot, so it lines up only on that camera.
-- Twisting (Alt+drag, and joined parts like the head) isn't stopped by solids yet; only moves are.
+- Twists turn around the view direction (like Blender's R); no trackball turning yet.
 - Arranging pushes things out of what they land on; things it passes on the way aren't checked (it follows the mouse, not a path).
 - Stamp places one copy per click (no brush/drag-painting yet).
 - A puppet's own parts can pass through each other (hand into own body).

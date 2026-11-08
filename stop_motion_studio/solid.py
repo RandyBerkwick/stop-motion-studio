@@ -390,6 +390,163 @@ class SM_OT_solid_drag(bpy.types.Operator):
         return {'RUNNING_MODAL'}
 
 
+# -------------------------------------------------------------- solid twist
+
+def _rotate_about(pivot, axis, angle):
+    return Matrix.Translation(pivot) @ Matrix.Rotation(angle, 4, axis) @ Matrix.Translation(-pivot)
+
+
+def twist_limit(points, pivot, axis, start, end, tree, eps=0.002, step_deg=2.0):
+    """Turn `points` about `pivot`/`axis` from angle `start` toward `end`.
+
+    Returns (allowed angle, blocked). Each small step is swept as straight
+    segments; a step that would carry any point into a surface from its
+    front stops the turn just short of it. Turning away from contact (out
+    of a surface) is always free, like the solid drag."""
+    import math
+    if tree is None or not points or abs(end - start) < 1e-9:
+        return end, False
+    axis = axis.normalized()
+    n = max(1, int(math.ceil(abs(end - start) / math.radians(step_deg))))
+    da = (end - start) / n
+    a = start
+    rel = [p - pivot for p in points]
+    rot_a = Matrix.Rotation(a, 3, axis)
+    cur = [pivot + rot_a @ r for r in rel]
+    for _ in range(n):
+        rot_b = Matrix.Rotation(a + da, 3, axis)
+        nxt = [pivot + rot_b @ r for r in rel]
+        best = None
+        for p0, p1 in zip(cur, nxt):
+            seg = p1 - p0
+            length = seg.length
+            if length < 1e-9:
+                continue
+            d = seg / length
+            loc, normal, _i, dist = tree.ray_cast(p0, d, length + eps)
+            if loc is not None and normal.dot(d) < 0.0:
+                frac = max(0.0, (dist - eps) / length)
+                best = frac if best is None else min(best, frac)
+        if best is not None:
+            return a + da * best, True
+        a += da
+        cur = nxt
+    return a, False
+
+
+class SM_OT_solid_twist(bpy.types.Operator):
+    """Turn a part or prop around the view; it stops where it would touch something. Ctrl: pass through. Esc: cancel"""
+    bl_idname = "stop_motion.solid_twist"
+    bl_label = "Solid Twist"
+    bl_options = {'REGISTER', 'UNDO', 'BLOCKING'}
+
+    puppet: StringProperty()
+    ring: IntProperty(default=-1)
+    prop: StringProperty()
+
+    def _setup(self, context):
+        scene = context.scene
+        dg = context.evaluated_depsgraph_get()
+        self.ob = None
+        self.pb = None
+        if self.prop:
+            ob = bpy.data.objects.get(self.prop)
+            if ob is None:
+                return False
+            self.ob = ob
+            self.start = world_matrix(context, ob)
+            pts = object_points(context, ob)
+            self.pivot = (sum(pts, Vector((0, 0, 0))) / len(pts)) if pts else self.start.translation.copy()
+            exclude = {ob} | set(ob.children_recursive)
+        else:
+            arm = bpy.data.objects.get(self.puppet)
+            if arm is None or not (0 <= self.ring < len(arm.stop_motion_puppet.rings)):
+                return False
+            ring = arm.stop_motion_puppet.rings[self.ring]
+            pb = arm.pose.bones.get(ring.bone)
+            if pb is None:
+                return False
+            self.arm, self.pb = arm, pb
+            self.start = pb.matrix.copy()
+            self.pivot = arm.matrix_world @ pb.head
+            pts = ring_points(context, arm, ring, ring.bone, exclude_pinned=(ring.pin is None))
+            exclude = own_meshes(scene, arm)
+        self.points = pts
+        self.tree = obstacle_tree(scene, dg, exclude)
+        return True
+
+    def _apply(self, angle):
+        R = _rotate_about(self.pivot, self.axis, angle)
+        if self.ob is not None:
+            self.ob.matrix_world = R @ self.start
+        else:
+            mw = self.arm.matrix_world
+            self.pb.matrix = mw.inverted() @ R @ mw @ self.start
+
+    def _screen_angle(self, event):
+        import math
+        m = (event.mouse_region_x - self.pivot2d.x, event.mouse_region_y - self.pivot2d.y)
+        return math.atan2(m[1], m[0])
+
+    def invoke(self, context, event):
+        rv3d = context.region_data
+        if rv3d is None or not self._setup(context):
+            return {'CANCELLED'}
+        p2 = view3d_utils.location_3d_to_region_2d(context.region, rv3d, self.pivot)
+        if p2 is None:
+            return {'CANCELLED'}
+        self.pivot2d = p2
+        self.axis = (rv3d.view_rotation @ Vector((0, 0, 1))).normalized()   # towards the viewer
+        self.last_screen = self._screen_angle(event)
+        self.want = 0.0      # where the mouse says
+        self.angle = 0.0     # where the part is allowed to be
+        context.window_manager.modal_handler_add(self)
+        context.window.cursor_modal_set('SCROLL_XY')
+        return {'RUNNING_MODAL'}
+
+    def _say(self, context, text):
+        from . import studio
+        if studio.is_active():
+            studio.toast(text, 0.8)
+            studio.redraw()
+        elif context.area:
+            context.area.header_text_set(text)
+
+    def _finish(self, context, cancel):
+        context.window.cursor_modal_restore()
+        if context.area:
+            context.area.header_text_set(None)
+        if cancel:
+            self._apply(0.0)
+            return {'CANCELLED'}
+        if self.ob is not None and is_prop(self.ob) and getattr(self.ob, "stop_motion_falls", True) \
+                and held_by(self.ob) is None:
+            drop_to_surface(context, self.ob)   # a tipped prop settles back onto its surface
+        return {'FINISHED'}
+
+    def modal(self, context, event):
+        import math
+        if event.type == 'MOUSEMOVE':
+            a = self._screen_angle(event)
+            d = (a - self.last_screen + math.pi) % (2 * math.pi) - math.pi   # unwrap
+            self.last_screen = a
+            self.want += d * (0.25 if event.shift else 1.0)
+            if event.ctrl:
+                self.angle, blocked = self.want, False
+            else:
+                self.angle, blocked = twist_limit(self.points, self.pivot, self.axis, self.angle, self.want, self.tree)
+            self._apply(self.angle)
+            self._say(context, "Touching something solid · Ctrl to pass through" if blocked
+                      else "Turn · Shift: fine · Ctrl: pass through · Esc: cancel")
+            return {'RUNNING_MODAL'}
+        if event.type in {'LEFTMOUSE', 'RET', 'NUMPAD_ENTER'} and event.value in {'RELEASE', 'PRESS'}:
+            if event.type != 'LEFTMOUSE' or event.value == 'RELEASE':
+                return self._finish(context, False)
+        if event.type in {'RIGHTMOUSE', 'ESC'} and event.value == 'PRESS':
+            return self._finish(context, True)
+        return {'RUNNING_MODAL'}
+
+
 # ---------------------------------------------------------------- operators
 
 class SM_OT_make_prop(bpy.types.Operator):
@@ -503,16 +660,20 @@ class SM_OT_grab_prop(bpy.types.Operator):
             o.select_set(False)
         ob.select_set(True)
         context.view_layer.objects.active = ob
+        solid_on = context.scene.stop_motion.solid_world and held_by(ob) is None
         if event.alt:
-            bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
-        elif context.scene.stop_motion.solid_world and held_by(ob) is None:
+            if solid_on:
+                bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', prop=ob.name)
+            else:
+                bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
+        elif solid_on:
             bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', prop=ob.name)
         else:
             bpy.ops.transform.translate('INVOKE_DEFAULT', release_confirm=True)
         return {'FINISHED'}
 
 
-classes = (SM_OT_solid_drag, SM_OT_make_prop, SM_OT_unprop, SM_OT_drop_prop,
+classes = (SM_OT_solid_drag, SM_OT_solid_twist, SM_OT_make_prop, SM_OT_unprop, SM_OT_drop_prop,
            SM_OT_hold_prop, SM_OT_let_go, SM_OT_grab_prop)
 
 

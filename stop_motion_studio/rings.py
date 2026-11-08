@@ -83,7 +83,10 @@ class SM_OT_grab_ring(bpy.types.Operator):
         pb.select = True
         arm.data.bones.active = arm.data.bones[ring.bone]
         if twist or pb.bone.use_connect:
-            bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
+            if solid_world:
+                bpy.ops.stop_motion.solid_twist('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
+            else:
+                bpy.ops.transform.rotate('INVOKE_DEFAULT', release_confirm=True)
         elif solid_world:
             bpy.ops.stop_motion.solid_drag('INVOKE_DEFAULT', puppet=arm.name, ring=self.ring)
         else:
