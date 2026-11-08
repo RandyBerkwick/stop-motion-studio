@@ -31,14 +31,22 @@ def _on_ghost(self, context):
     core.update_ghost(context.scene)
 
 
+def _is_camera(self, ob):
+    return ob.type == 'CAMERA'
+
+
 class SM_Shot(bpy.types.PropertyGroup):
     uid: StringProperty()
     hold: IntProperty(name="Hold", min=1, max=96, default=2,
                       description="How many frames this shot is shown for")
+    camera: PointerProperty(type=bpy.types.Object, poll=_is_camera, name="Camera",
+                            description="The camera this shot is filmed with (the film cuts when it changes)")
 
 
 class SM_Settings(bpy.types.PropertyGroup):
     shots: CollectionProperty(type=SM_Shot)
+    live_camera: PointerProperty(type=bpy.types.Object, poll=_is_camera, name="Next shots film with",
+                                 description="The camera the next shots are filmed with")
     active_index: IntProperty(default=-1, update=_on_active)
 
     default_hold: EnumProperty(

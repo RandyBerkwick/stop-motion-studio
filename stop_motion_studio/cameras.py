@@ -8,7 +8,7 @@ checking angles: it isn't recorded in the shots.
 Saved views are bookmarks for the free view (not the camera)."""
 
 import bpy
-from bpy.props import (CollectionProperty, FloatProperty, FloatVectorProperty,
+from bpy.props import (EnumProperty, CollectionProperty, FloatProperty, FloatVectorProperty,
                        IntProperty, StringProperty, BoolProperty)
 
 from . import core
@@ -81,19 +81,40 @@ def restore_view(saved, r3d):
 # ---------------------------------------------------------------- operators
 
 class SM_OT_use_camera(bpy.types.Operator):
-    """Film through this camera"""
+    """Film through this camera. Live: the next shots. On a shot: this shot and the rest of its run, up to the next cut"""
     bl_idname = "stop_motion.use_camera"
     bl_label = "Use Camera"
     bl_options = {'REGISTER', 'UNDO'}
 
     name: StringProperty()
+    scope: EnumProperty(items=[('AUTO', "Auto", "Live: the next shots; on a shot: up to the next cut"),
+                               ('RUN', "From here to the next cut", ""),
+                               ('SHOT', "This shot only", ""),
+                               ('LIVE', "The next shots", ""),
+                               ('LOOK', "Just look", "Look through it without changing the film")],
+                        default='AUTO', options={'SKIP_SAVE'})
 
     def execute(self, context):
+        scene = context.scene
         cam = bpy.data.objects.get(self.name)
         if cam is None or cam.type != 'CAMERA':
             return {'CANCELLED'}
-        context.scene.camera = cam
-        core.update_ghost(context.scene)
+        if self.scope == 'LOOK':
+            scene.camera = cam
+            core.update_ghost(scene)
+            return {'FINISHED'}
+        index = core.shot_index_at(scene, scene.frame_current)
+        scope = self.scope
+        if scope == 'AUTO':
+            scope = 'RUN' if index >= 0 else 'LIVE'
+        a, b = core.set_camera(scene, index, cam, scope)
+        core.update_ghost(scene)
+        if scope == 'LIVE' or a >= len(scene.stop_motion.shots):
+            self.report({'INFO'}, "Next shots film with %s" % cam.name)
+        elif b - a == 1:
+            self.report({'INFO'}, "Shot %d films with %s" % (a + 1, cam.name))
+        else:
+            self.report({'INFO'}, "Shots %d–%d film with %s" % (a + 1, b, cam.name))
         return {'FINISHED'}
 
 

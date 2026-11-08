@@ -511,7 +511,7 @@ def draw_view_headers(kit, L, scene, s):
         x -= lw
         filming = cam == scene.camera
         kit.button("cam:" + cam.name, Rect(x, hc.cy - 15 * s, lw - 22 * s, 30 * s), cam.name,
-                   (lambda n=cam.name: run(bpy.ops.stop_motion.use_camera, name=n)), selected=filming, size=12)
+                   (lambda n=cam.name: use_camera(n)), selected=filming, size=12)
         locked = cameras.is_locked(cam)
         kit.button("lock:" + cam.name, Rect(x + lw - 20 * s, hc.cy - 15 * s, 20 * s, 30 * s), "",
                    (lambda n=cam.name: run(bpy.ops.stop_motion.lock_camera, name=n)), selected=locked,
@@ -528,6 +528,26 @@ def draw_view_headers(kit, L, scene, s):
     cells = Rect(hr.x + 10 * s, hr.cy - 16 * s, hr.w - 20 * s, 32 * s).split_cols(len(tabs), 2 * s)
     for (key, label), cell in zip(tabs, cells):
         kit.button("side:" + key, cell, label, (lambda k=key: set_side(k)), "tab", S.side == key, size=12)
+
+
+def use_camera(name):
+    """Header camera buttons: live, the next shots film with it; on a shot, it cuts to it up to the next cut."""
+    scene = bpy.context.scene
+    before = core.shot_index_at(scene, scene.frame_current)
+    run(bpy.ops.stop_motion.use_camera, name=name)
+    n = len(scene.stop_motion.shots)
+    if before < 0:
+        toast("Next shots film with " + name)
+    else:
+        cams = core.shot_cameras(scene)
+        j = before
+        while j < n and cams[j] == cams[before]:
+            j += 1
+        if j - before == 1:
+            toast("Shot %d films with %s" % (before + 1, name))
+        else:
+            toast("Shots %d–%d film with %s" % (before + 1, j, name))
+    redraw()
 
 
 def set_side(k):
@@ -968,9 +988,15 @@ def draw_strip(kit, r, scene, s):
     p.clip(r)
     x = r.x - off
     kit.area("strip", r, on_wheel=lambda st: kit.scroll.__setitem__("strip", kit.scroll.get("strip", 0) - st * 60 * s) or redraw())
+    cut_list = core.cuts(scene)
+    many = len({c for _i, c in cut_list} | {core.live_camera(scene)} - {None}) > 1
+    cut_at = dict(cut_list) if many else {}
     for i, shot, start, hold in spans:
         w = max(54 * s, hold * unit)
         card = Rect(x, r.y, w, card_h)
+        if card.right >= r.x and card.x <= r.right and i in cut_at:
+            # a cut: the film switches camera here
+            p.rect(Rect(card.x - 4.5 * s, r.y, 3 * s, card_h), t.yellow, 1.5 * s)
         if card.right >= r.x and card.x <= r.right:
             sel = i == cur
             p.rect(card, t.raised, 7 * s)
@@ -984,6 +1010,12 @@ def draw_strip(kit, r, scene, s):
             p.text(Rect(card.x + 6 * s, card.y + 2 * s, w, 14 * s), str(i + 1), 11 * s, t.soft, "left", sel)
             p.text(Rect(card.x, card.y + 2 * s, w - 12 * s, 14 * s), "%df" % hold, 11 * s,
                    t.text if hold != int(sm.default_hold) else t.muted, "right")
+            if i in cut_at:
+                name = cut_at[i].name
+                tw = min(thumb.w - 4 * s, kit.text_width(name, 10) + 10 * s)
+                tag = Rect(thumb.x + 2 * s, thumb.y + 2 * s, tw, 14 * s)
+                p.rect(tag, t.yellow, 3 * s)
+                p.text(tag, name, 10 * s, t.ground, "center", True)
             if sel:
                 p.rect_outline(card, t.blue, 7 * s, 2 * s)
             kit.area("shot:%d" % i, card, on_click=(lambda k=i: run(bpy.ops.stop_motion.goto_shot, index=k) or redraw()),
@@ -1002,6 +1034,11 @@ def draw_strip(kit, r, scene, s):
     live = Rect(x, r.y, 80 * s, card_h)
     p.rect_outline(live, t.accent, 7 * s, 2 * s)
     p.text(live, "● LIVE", 11 * s, t.accent, "center", True)
+    lc = core.live_camera(scene)
+    cams = core.shot_cameras(scene)
+    if lc is not None and cams and cams[-1] != lc:
+        p.rect(Rect(live.x - 4.5 * s, r.y, 3 * s, card_h), t.yellow, 1.5 * s)
+        p.text(Rect(live.x, live.y + 4 * s, live.w, 14 * s), lc.name, 10 * s, t.yellow, "center", True)
     kit.area("strip:live", live, on_click=lambda: run(bpy.ops.stop_motion.go_live) or redraw())
     p.unclip()
 

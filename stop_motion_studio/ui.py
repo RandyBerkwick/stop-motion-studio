@@ -227,6 +227,28 @@ class SM_PT_cameras(bpy.types.Panel):
             locked = cameras.is_locked(cam)
             row.operator("stop_motion.lock_camera", text="",
                          icon='LOCKED' if locked else 'UNLOCKED', depress=locked).name = cam.name
+        # camera cuts: which camera films this shot
+        here = core.shot_index_at(scene, scene.frame_current)
+        cut_box = layout.box()
+        if here >= 0:
+            cam_here = core.shot_cameras(scene)[here]
+            cut_box.label(text="Shot %d films with %s" % (here + 1, cam_here.name if cam_here else "—"),
+                          icon='SEQUENCE')
+            for cam in cameras.cameras(scene):
+                if cam == cam_here:
+                    continue
+                r = cut_box.row(align=True)
+                r.label(text="Cut to " + cam.name)
+                op = r.operator("stop_motion.use_camera", text="Till next cut")
+                op.name, op.scope = cam.name, 'RUN'
+                op = r.operator("stop_motion.use_camera", text="This shot")
+                op.name, op.scope = cam.name, 'SHOT'
+        else:
+            nxt = core.live_camera(scene)
+            cut_box.label(text="Next shots film with %s" % (nxt.name if nxt else "—"), icon='SEQUENCE')
+        cut_list = core.cuts(scene)
+        if len(cut_list) > 1:
+            cut_box.label(text="Cuts: " + " · ".join("%d %s" % (i + 1, c.name) for i, c in cut_list))
         row = layout.row(align=True)
         row.operator("stop_motion.new_camera", text="New from free view", icon='ADD')
         area, _r = core.find_camera_area(context.screen)

@@ -48,9 +48,11 @@ On an earlier shot, this replaces it with the new pose"""
             return {'FINISHED'}
 
         frame = core.live_frame(scene)
+        cam = core.live_camera(scene)
         shot = sm.shots.add()
         shot.uid = core.new_uid()
         shot.hold = int(sm.default_hold)
+        shot.camera = cam
         core.key_pose(scene, frame, objs)
         core.sync_range(scene)
         core.capture(context, scene, shot.uid)
@@ -146,6 +148,7 @@ class SM_OT_duplicate_shot(bpy.types.Operator):
         new = sm.shots.add()
         new.uid = core.new_uid()
         new.hold = hold
+        new.camera = core.shot_cameras(scene)[i]
         sm.shots.move(len(sm.shots) - 1, i + 1)
         core.retime(scene, before)
         # Evaluate the source pose, then key it into the new slot.

@@ -61,6 +61,113 @@ def is_live(scene):
 
 def sync_range(scene):
     scene.frame_end = max(scene.frame_start, live_frame(scene) - 1)
+    sync_cuts(scene)
+
+
+# ---------------------------------------------------------------- camera cuts
+
+CUT_PREFIX = "SM cut "
+
+
+def _alive(ob):
+    try:
+        return ob is not None and ob.name in bpy.data.objects and ob.type == 'CAMERA'
+    except ReferenceError:
+        return False
+
+
+def shot_cameras(scene):
+    """The camera each shot is filmed with (a shot with none set carries on with the one before)."""
+    out, prev = [], None
+    for s in settings(scene).shots:
+        c = s.camera if _alive(s.camera) else prev
+        out.append(c)
+        prev = c
+    first = next((c for c in out if c is not None), None)
+    return [c if c is not None else first for c in out]
+
+
+def live_camera(scene):
+    """The camera the next shot will be filmed with."""
+    sm = settings(scene)
+    if _alive(sm.live_camera):
+        return sm.live_camera
+    cams = shot_cameras(scene)
+    if cams and cams[-1] is not None:
+        return cams[-1]
+    return scene.camera if _alive(scene.camera) else None
+
+
+def camera_at(scene, frame):
+    i = shot_index_at(scene, frame)
+    if i < 0:
+        return live_camera(scene)
+    return shot_cameras(scene)[i] or live_camera(scene)
+
+
+def cuts(scene):
+    """[(shot index, camera)] where the film cuts to another camera (shot 0 included)."""
+    out, prev = [], None
+    for i, c in enumerate(shot_cameras(scene)):
+        if c is not None and c != prev:
+            out.append((i, c))
+            prev = c
+    return out
+
+
+def sync_cuts(scene):
+    """Camera markers at each cut, so playback and export switch cameras."""
+    for m in list(scene.timeline_markers):
+        if m.name.startswith(CUT_PREFIX):
+            scene.timeline_markers.remove(m)
+    seq = shot_cameras(scene) + [live_camera(scene)]
+    used = {c for c in seq if c is not None}
+    if len(used) > 1:
+        starts = [st for _i, _s, st, _h in shot_spans(scene)] + [live_frame(scene)]
+        prev = None
+        for st, c in zip(starts, seq):
+            if c is not None and c != prev:
+                m = scene.timeline_markers.new(CUT_PREFIX + c.name, frame=st)
+                m.camera = c
+                prev = c
+    c = camera_at(scene, scene.frame_current)
+    if c is not None and scene.camera != c:
+        scene.camera = c
+
+
+def set_camera(scene, index, cam, scope='RUN'):
+    """Film shot `index` with `cam`.
+
+    RUN: this shot and the ones after it that used the same camera (up to the
+    next cut); if that reaches the end, the next shots use it too.
+    SHOT: this shot only. LIVE (index ignored): the next shots."""
+    sm = settings(scene)
+    if scope == 'LIVE' or not (0 <= index < len(sm.shots)):
+        sm.live_camera = cam
+        sync_cuts(scene)
+        return (len(sm.shots), len(sm.shots))
+    cams = shot_cameras(scene)
+    old = cams[index]
+    if scope == 'SHOT':
+        nxt = cams[index + 1] if index + 1 < len(cams) else live_camera(scene)
+        # pin the shot after it to what it was, so only this one changes
+        if index + 1 < len(sm.shots):
+            sm.shots[index + 1].camera = nxt
+        elif not _alive(sm.live_camera):
+            sm.live_camera = nxt
+        sm.shots[index].camera = cam
+        sync_cuts(scene)
+        return (index, index + 1)
+    j = index
+    while j < len(cams) and cams[j] == old:
+        sm.shots[j].camera = cam
+        j += 1
+    if j < len(cams):
+        sm.shots[j].camera = cams[j]    # the next cut stays where it was
+    elif live_camera(scene) == old or not _alive(sm.live_camera):
+        sm.live_camera = cam
+    sync_cuts(scene)
+    return (index, j)
 
 
 def new_uid():
@@ -358,19 +465,25 @@ def forget_capture(scene, uid):
 # --------------------------------------------------------------------- ghost
 
 def update_ghost(scene):
+    for ob in scene.objects:      # clear the ghost off every camera first
+        if ob.type == 'CAMERA':
+            bgs = ob.data.background_images
+            for bg in list(bgs):
+                if bg.image is not None and bg.image.name.startswith(GHOST_PREFIX):
+                    bgs.remove(bg)
     cam = scene.camera
     if cam is None or cam.type != 'CAMERA':
         return
     sm = settings(scene)
     bgs = cam.data.background_images
-    for bg in list(bgs):
-        if bg.image is not None and bg.image.name.startswith(GHOST_PREFIX):
-            bgs.remove(bg)
     if not sm.ghost_enabled:
         return
     frame = scene.frame_current
+    here = shot_index_at(scene, frame)
+    cams = shot_cameras(scene)
+    # only shots taken through this camera line up with it
     earlier = [s.uid for _i, s, start, _h in shot_spans(scene) if start < frame
-               and shot_index_at(scene, frame) != _i]
+               and here != _i and (cams[_i] is None or cams[_i] == cam)]
     picks = list(reversed(earlier[-sm.ghost_count:]))
     added = False
     for depth, uid in enumerate(picks):
