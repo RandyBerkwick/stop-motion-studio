@@ -98,6 +98,7 @@ class State:
         self.export_kind = 'MOVIE'
         self.export_quality = 'AS_SHOT'
         self.hint_until = 0.0
+        self.saved_prompt = None      # Blender's save prompt setting, while the Studio has it off
         self.painter = None
         self.kit = None
         self.offscreens = {}
@@ -199,6 +200,36 @@ def save_project():
     path = os.path.join(PROJECTS_DIR, "Scene %02d.blend" % n)
     run(bpy.ops.wm.save_as_mainfile, filepath=path)
     toast("Saved as " + os.path.basename(path))
+
+
+def autosave_path():
+    """Where an unsaved project goes when the Studio closes."""
+    os.makedirs(PROJECTS_DIR, exist_ok=True)
+    n = 1
+    while os.path.exists(os.path.join(PROJECTS_DIR, "Scene %02d.blend" % n)):
+        n += 1
+    return os.path.join(PROJECTS_DIR, "Scene %02d.blend" % n)
+
+
+@persistent
+def _on_exit(_dummy=None):
+    """Quitting from the Studio: save the work (no Blender dialog), then put the prompt setting back."""
+    try:
+        data = getattr(bpy, "data", None)
+        if S is None or not S.active or data is None or not hasattr(data, "filepath"):
+            return
+    except (AttributeError, TypeError, NameError):
+        return                     # Python is already shutting down
+    try:
+        if data.filepath:
+            if data.is_dirty:
+                bpy.ops.wm.save_mainfile()
+        elif any(len(sc.stop_motion.shots) for sc in data.scenes):
+            # never saved: keep it in the projects folder rather than lose it
+            bpy.ops.wm.save_as_mainfile(filepath=autosave_path())
+    except Exception as exc:
+        print("Stop Motion: couldn't save on quit:", exc)
+    _restore_prompt()
 
 
 def list_projects():
@@ -845,7 +876,7 @@ def draw_props(kit, r, ctx, scene, s):
                lambda: start_arrange(ob.name if (ob and not stamping) else ""), selected=bool(stamping),
                enabled=bool(stamping) or can_stamp)
     col.note("Drag along surfaces · wheel spins · Alt leans" if not stamping
-             else "Click to place %s · Esc stops" % arrange.ARR["stamp"])
+             else "Click or drag to place %s · Esc stops" % arrange.ARR["stamp"])
     a, b = col.row(32).split_cols(2, 6 * s)
     kit.toggle("lean", a, "Lean with surface", sm.stick_align, lambda v: setattr(sm, "stick_align", v) or redraw(), Theme.blue)
     if can_stamp:
@@ -853,6 +884,10 @@ def draw_props(kit, r, ctx, scene, s):
                    lambda v: run(bpy.ops.stop_motion.set_piece, on=v) or redraw())
     else:
         kit.button("setpiece", b, "Set piece", lambda: None, enabled=False, size=12)
+    sp = col.row(24)
+    kit.label(Rect(sp.x, sp.y, 110 * s, sp.h), "Copy spacing", 12, Theme.soft)
+    kit.slider("stampspace", Rect(sp.x + 116 * s, sp.y, sp.w - 116 * s, sp.h), (sm.stamp_spacing - 0.3) / 4.7,
+               lambda v: setattr(sm, "stamp_spacing", 0.3 + v * 4.7) or redraw())
     kit.toggle("selfsolid", col.row(30), "Puppets' own parts are solid", sm.self_solid,
                lambda v: setattr(sm, "self_solid", v) or redraw())
     col.y -= 8 * s
@@ -1456,6 +1491,13 @@ def enter_studio(context):
     init_free_view(context.scene)
     S.active = True
     S.wanted = True
+    # Blender's "save changes?" box doesn't belong in the Studio: work is saved on quit instead
+    view = context.preferences.view
+    if S.saved_prompt is None:
+        S.saved_prompt = view.use_save_prompt
+    view.use_save_prompt = False
+    from . import macos
+    macos.set_dock_icon()
     S.chrome = True
     S.overlay = None
     if not S.went_fullscreen:
@@ -1477,11 +1519,20 @@ def enter_studio(context):
     return True
 
 
+def _restore_prompt(context=None):
+    if S.saved_prompt is not None:
+        (context or bpy.context).preferences.view.use_save_prompt = S.saved_prompt
+        S.saved_prompt = None
+
+
 def exit_studio(context):
     window = context.window
     S.active = False
     S.wanted = False
     core.capture_hook = None
+    _restore_prompt(context)
+    from . import macos
+    macos.reset_dock_icon()
     area, region = studio_area(window)
     if area is not None:
         space = area.spaces.active
@@ -1568,6 +1619,7 @@ def register():
         bpy.utils.register_class(c)
     _handle = bpy.types.SpaceView3D.draw_handler_add(draw_studio, (), 'WINDOW', 'POST_PIXEL')
     bpy.app.handlers.load_post.append(_on_load)
+    bpy.app.handlers.exit_pre.append(_on_exit)
     kc = bpy.context.window_manager.keyconfigs.addon
     if kc is not None:
         km = kc.keymaps.new(name="Window", space_type='EMPTY')
@@ -1582,6 +1634,9 @@ def unregister():
     _keymaps.clear()
     if _on_load in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_on_load)
+    if _on_exit in bpy.app.handlers.exit_pre:
+        bpy.app.handlers.exit_pre.remove(_on_exit)
+    _restore_prompt()
     if _handle is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_handle, 'WINDOW')
         _handle = None

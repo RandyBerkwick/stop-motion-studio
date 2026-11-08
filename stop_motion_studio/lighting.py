@@ -335,7 +335,9 @@ EFFECTS = [
     ('FLASH', "Lightning flash", "One bright white shot"),
     ('FADE_NIGHT', "Fade to night", "Dim and cool over the next shots, then stay night"),
     ('LIGHTS_OUT', "Lights out", "Lights off from this shot on"),
+    ('TORCH', "Torch sweep", "A torch beam sweeps across the set over the next shots"),
 ]
+TORCH_NAME = "SM Torch"
 _FLICKER = (1.0, 0.55, 0.9, 0.4, 1.0, 0.7, 0.35, 0.95, 0.6, 1.0)
 
 
@@ -349,10 +351,79 @@ def _mix(a, b, t):
     return a + (b - a) * t
 
 
+def _aim(scene):
+    """What the camera looks at in the middle of its view (else the origin)."""
+    from mathutils import Vector
+    cam = scene.camera
+    if cam is None:
+        return Vector((0, 0, 0.5))
+    dg = bpy.context.evaluated_depsgraph_get()
+    o = cam.matrix_world.translation
+    d = (cam.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
+    hit, loc, _n, _i, _ob, _m = scene.ray_cast(dg, o, d)
+    return loc if hit else o + d * 4.0
+
+
+def torch_sweep(scene, index, count, sweep_deg=70.0):
+    """A torch (spot light) held by the camera, sweeping its beam left to right
+    over `count` shots from `index`. Off in every other shot."""
+    import math
+    from mathutils import Quaternion, Vector
+    spans = core.shot_spans(scene)
+    run = spans[index:index + max(1, count)]
+    if not run:
+        return 0
+    torch = scene.objects.get(TORCH_NAME)
+    new = torch is None
+    target = _aim(scene)
+    if new:
+        data = bpy.data.lights.new(TORCH_NAME, 'SPOT')
+        data.spot_size = math.radians(28)
+        data.spot_blend = 0.45
+        data.color = (1.0, 0.86, 0.62)
+        torch = bpy.data.objects.new(TORCH_NAME, data)
+        scene.collection.objects.link(torch)
+        cam = scene.camera
+        if cam is not None:
+            m = cam.matrix_world
+            torch.location = m.translation + m.to_3x3() @ Vector((0.25, -0.15, 0.0))
+        else:
+            torch.location = target + Vector((0, -4, 1.5))
+    dist = max(0.5, (target - torch.location).length)
+    energy = 90.0 * dist * dist
+    aim = (target - torch.location).normalized().to_track_quat('-Z', 'Y')
+    torch.rotation_mode = 'XYZ'
+    keep = scene.frame_current
+    frames = []
+    for n, (_i, _s, start, _h) in enumerate(run):
+        t = n / max(1, len(run) - 1)
+        yaw = math.radians(-sweep_deg / 2 + sweep_deg * t)
+        q = Quaternion((0, 0, 1), -yaw) @ aim
+        torch.rotation_euler = q.to_euler('XYZ', torch.rotation_euler)
+        torch.keyframe_insert("rotation_euler", frame=start)
+        torch.keyframe_insert("location", frame=start)
+        frames.append(start)
+    write_value(torch.data, "energy", frames, energy)
+    others = [st for _i, _s, st, _h in spans if st not in frames]
+    if new and others:
+        write_value(torch.data, "energy", others, 0.0)      # it's only on during the sweep
+    elif others:
+        after = [st for st in others if st > frames[-1]]
+        if after:
+            write_value(torch.data, "energy", after[:1], 0.0)
+    for fc in core.fcurves_of(torch):
+        for kp in fc.keyframe_points:
+            kp.interpolation = 'CONSTANT'
+    scene.frame_set(keep)
+    return len(run)
+
+
 def apply_effect(scene, effect, index, count):
     spans = core.shot_spans(scene)
     if not (0 <= index < len(spans)):
         return 0
+    if effect == 'TORCH':
+        return torch_sweep(scene, index, count)
     run = spans[index:index + max(1, count)] if effect in ('FLICKER', 'FADE_NIGHT') else spans[index:index + 1]
     if effect == 'LIGHTS_OUT':
         run = spans[index:]

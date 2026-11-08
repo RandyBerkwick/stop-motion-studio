@@ -187,6 +187,17 @@ def slide_check(context, d, new, surf):
 
 # ------------------------------------------------------------------ stamping
 
+def stamp_spacing(context, source):
+    """How far apart painted copies go: the object's size times the spacing setting."""
+    pts = ARR.get("_pts_" + source.name) or local_points(context, source)
+    ARR["_pts_" + source.name] = pts
+    sc = source.matrix_world.to_scale()
+    xs = [p.x * sc.x for p in pts]
+    ys = [p.y * sc.y for p in pts]
+    size = max(max(xs) - min(xs), max(ys) - min(ys), 1e-3)
+    return size * context.scene.stop_motion.stamp_spacing
+
+
 def stamp(context, source, hit, normal, align, rng=None, vary=0.15, tree=None):
     """Place a linked copy of `source` on the surface. Returns the copy."""
     rng = rng or random
@@ -238,8 +249,9 @@ class SM_OT_arrange(bpy.types.Operator):
         ARR["stamp"] = self.stamp_source
         ARR["count"] = 0
         self.drag = None
+        self.paint = None
         context.window_manager.modal_handler_add(self)
-        self._say(context, "Stamp: click on surfaces to place copies · Esc to stop" if self.stamp_source
+        self._say(context, "Stamp: click or drag over surfaces to place copies · Esc to stop" if self.stamp_source
                   else "Arrange: drag an object along surfaces · wheel spins · Alt lean · Esc to stop")
         return {'RUNNING_MODAL'}
 
@@ -270,6 +282,19 @@ class SM_OT_arrange(bpy.types.Operator):
             if kit is not None and kit.over_ui(m.x, m.y):
                 return False
         return True
+
+    def _paint_at(self, context, m):
+        pt = self.paint
+        hit = self._hit(context, m, pt["exclude"])
+        if hit is None:
+            return
+        if pt["last"] is not None and (hit[0] - pt["last"]).length < pt["spacing"]:
+            return
+        sm = context.scene.stop_motion
+        stamp(context, pt["src"], hit[0], hit[1], sm.stick_align, vary=sm.stamp_vary, tree=pt["tree"])
+        pt["last"] = hit[0].copy()
+        pt["n"] += 1
+        self._say(context, "%d placed · keep dragging · Esc to stop" % ARR["count"])
 
     def _hit(self, context, m, exclude):
         origin, direction = mouse_ray(self.region, self._rv3d(), m)
@@ -331,6 +356,11 @@ class SM_OT_arrange(bpy.types.Operator):
         m = self._mouse(event)
 
         if t in {'ESC', 'RIGHTMOUSE'} and v == 'PRESS':
+            if self.paint is not None:
+                if self.paint["n"]:
+                    bpy.ops.ed.undo_push(message="Stamp %d" % self.paint["n"])
+                self.paint = None
+                return {'RUNNING_MODAL'}
             if self.drag is not None:
                 self._finish_drag(context, cancel=True)
                 return {'RUNNING_MODAL'}
@@ -349,6 +379,20 @@ class SM_OT_arrange(bpy.types.Operator):
                 return {'RUNNING_MODAL'}
             return {'RUNNING_MODAL'}
 
+        if self.paint is not None:
+            # painting copies: one every `spacing` along the stroke
+            if t in {'MOUSEMOVE', 'INBETWEEN_MOUSEMOVE'}:
+                self._paint_at(context, m)
+                return {'RUNNING_MODAL'}
+            if t == 'LEFTMOUSE' and v == 'RELEASE':
+                n = self.paint["n"]
+                self.paint = None
+                if n:
+                    bpy.ops.ed.undo_push(message="Stamp %d" % n)
+                self._say(context, "%d placed · drag over surfaces to paint more · Esc to stop" % ARR["count"])
+                return {'RUNNING_MODAL'}
+            return {'RUNNING_MODAL'}
+
         if t == 'LEFTMOUSE' and v == 'PRESS' and self._in_view(context, m):
             scene = context.scene
             if ARR["stamp"]:
@@ -356,13 +400,10 @@ class SM_OT_arrange(bpy.types.Operator):
                 if src is None:
                     return self._end(context)
                 exclude = {src} | set(src.children_recursive)
-                hit = self._hit(context, m, exclude)
-                if hit is not None:
-                    tree = solid.obstacle_tree(scene, context.evaluated_depsgraph_get(), exclude)
-                    stamp(context, src, hit[0], hit[1], scene.stop_motion.stick_align,
-                          vary=scene.stop_motion.stamp_vary, tree=tree)
-                    bpy.ops.ed.undo_push(message="Stamp %s" % src.name)
-                    self._say(context, "%d placed · click for more · Esc to stop" % ARR["count"])
+                self.paint = {"src": src, "exclude": exclude, "last": None, "n": 0,
+                              "tree": solid.obstacle_tree(scene, context.evaluated_depsgraph_get(), exclude),
+                              "spacing": stamp_spacing(context, src)}
+                self._paint_at(context, m)
                 return {'RUNNING_MODAL'}
             hit = self._hit(context, m, ())
             if hit is not None:

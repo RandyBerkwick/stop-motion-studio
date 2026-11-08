@@ -185,6 +185,7 @@ class SM_PT_props(bpy.types.Panel):
             row.enabled = True
         box.prop(scene.stop_motion, "stick_align")
         box.prop(scene.stop_motion, "stamp_vary")
+        box.prop(scene.stop_motion, "stamp_spacing")
         row = box.row(align=True)
         row.operator("stop_motion.set_piece", text="Make set piece").on = True
         row.operator("stop_motion.set_piece", text="Back in shots").on = False
@@ -485,6 +486,7 @@ class SM_PT_view(bpy.types.Panel):
         layout.operator("stop_motion.focus_camera", text="Camera only (Shift F5)", icon='FULLSCREEN_ENTER')
         layout.prop(sm, "key_scope")
         layout.prop(sm, "show_hud")
+        layout.prop(sm, "show_strip")
         layout.prop(sm, "capture_dir")
         if not bpy.data.filepath:
             layout.label(text="Save your file to keep shot pictures", icon='INFO')
@@ -509,6 +511,9 @@ def draw_hud():
     blf.shadow(font, 3, 0.0, 0.0, 0.0, 0.9)
     blf.shadow_offset(font, 1, -1)
     x, y = 16 * ui, 16 * ui
+    from . import strip as _strip
+    if _strip.wanted(ctx):
+        y = (_strip.CARD_H + 30) * ui      # above the shot strip
     if idx >= 0:
         blf.color(font, 0.49, 0.77, 1.0, 1.0)
         text = "POSING OVER  shot %d" % (idx + 1)

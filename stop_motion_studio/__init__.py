@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Stop Motion Studio: move-and-shoot stop-motion animation inside full Blender."""
 
-from . import props, puppet, solid, arrange, ops, rings, cameras, lighting, sculpt, library, layout, studio, ui
+from . import props, puppet, solid, arrange, ops, rings, cameras, lighting, sculpt, library, layout, studio, strip, ui
 
-_modules = (props, puppet, solid, arrange, ops, rings, cameras, lighting, sculpt, library, layout, studio, ui)
+_modules = (props, puppet, solid, arrange, ops, rings, cameras, lighting, sculpt, library, layout, studio, strip, ui)
 
 
 def register():

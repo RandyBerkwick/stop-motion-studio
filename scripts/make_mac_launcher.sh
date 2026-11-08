@@ -28,15 +28,28 @@ cat > "$OUT/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>com.randyberkwick.stopmotionstudio</string>
   <key>CFBundleExecutable</key><string>Stop Motion Studio</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.9.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
 </dict>
 </plist>
 PLIST
-# borrow Blender's icon until the Studio has its own
-if [ -f "$APP/Contents/Resources/blender icon.icns" ]; then
+# the Studio's own icon (made from app_template/StopMotionStudio/icon.png)
+HERE="$(cd "$(dirname "$0")/.." && pwd)"
+PNG="$HERE/app_template/StopMotionStudio/icon.png"
+if [ -f "$PNG" ] && command -v iconutil >/dev/null 2>&1; then
+  SET="$(mktemp -d)/AppIcon.iconset"
+  mkdir -p "$SET"
+  for sz in 16 32 64 128 256 512; do
+    sips -z $sz $sz "$PNG" --out "$SET/icon_${sz}x${sz}.png" >/dev/null
+    d=$((sz * 2))
+    sips -z $d $d "$PNG" --out "$SET/icon_${sz}x${sz}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$SET" -o "$OUT/Contents/Resources/AppIcon.icns"
+elif [ -f "$APP/Contents/Resources/blender icon.icns" ]; then
   cp "$APP/Contents/Resources/blender icon.icns" "$OUT/Contents/Resources/AppIcon.icns"
-  /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$OUT/Contents/Info.plist" >/dev/null 2>&1 || true
 fi
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$OUT/Contents/Info.plist" >/dev/null 2>&1 || true
+# Finder caches icons: nudge it
+touch "$OUT"
 echo "Made $OUT"
 echo "Open it from ~/Applications (first time: right-click > Open, as it isn't signed)."
