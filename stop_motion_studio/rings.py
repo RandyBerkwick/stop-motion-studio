@@ -108,6 +108,9 @@ class SM_GGT_rings(bpy.types.GizmoGroup):
             return False
         if context.screen and context.screen.is_animation_playing:
             return False
+        from . import arrange
+        if arrange.ARR["active"]:
+            return False   # arranging: clicks pick objects, not rings
         return bool(puppet.puppets(context.scene)) or bool(solid.props(context.scene))
 
     def _signature(self, context):

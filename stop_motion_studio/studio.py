@@ -523,8 +523,8 @@ def draw_view_headers(kit, L, scene, s):
     if S.mode == 'REVIEW':
         kit.label(Rect(hr.x + 18 * s, hr.y, hr.w, hr.h), "EXPORT", 12, t.soft, "left", True)
         return
-    tabs = (('PUPPET', "Puppet"), ('PROPS', "Props"), ('LIGHT', "Light"), ('SCULPT', "Sculpt")) \
-        if S.mode != 'PUPPETS' else (('PUPPET', "Set up puppet"), ('PROPS', "Props"))
+    tabs = (('PUPPET', "Puppet"), ('PROPS', "Set"), ('LIGHT', "Light"), ('SCULPT', "Sculpt")) \
+        if S.mode != 'PUPPETS' else (('PUPPET', "Set up puppet"), ('PROPS', "Set & props"))
     cells = Rect(hr.x + 10 * s, hr.cy - 16 * s, hr.w - 20 * s, 32 * s).split_cols(len(tabs), 2 * s)
     for (key, label), cell in zip(tabs, cells):
         kit.button("side:" + key, cell, label, (lambda k=key: set_side(k)), "tab", S.side == key, size=12)
@@ -775,8 +775,40 @@ def draw_puppet_setup(kit, r, ctx, scene, s):
     kit.button("unpuppet", col.row(34), "Remove puppet setup", lambda: run(bpy.ops.stop_motion.unpuppet, puppet=arm.name) or redraw(), "danger")
 
 
+def start_arrange(stamp_from=""):
+    from . import arrange
+    if arrange.ARR["active"]:
+        arrange.ARR["active"] = False
+    else:
+        run(bpy.ops.stop_motion.arrange, 'INVOKE_DEFAULT', stamp_source=stamp_from)
+    redraw()
+
+
 def draw_props(kit, r, ctx, scene, s):
+    from . import arrange
     col = Column(kit, r, s)
+    sm = scene.stop_motion
+    col.title("Arrange the set")
+    on = arrange.ARR["active"]
+    stamping = on and arrange.ARR["stamp"]
+    ob = ctx.active_object
+    a, b = col.row(40).split_cols(2, 6 * s)
+    kit.button("arrange", a, "Stop" if on and not stamping else "Arrange",
+               lambda: start_arrange(""), "accent" if not on else "ghost", selected=on and not stamping)
+    can_stamp = ob is not None and arrange.arrangeable(scene, ob)
+    kit.button("stamp", b, "Stop" if stamping else "Stamp copies",
+               lambda: start_arrange(ob.name if (ob and not stamping) else ""), selected=bool(stamping),
+               enabled=bool(stamping) or can_stamp)
+    col.note("Drag along surfaces · wheel spins · Alt leans" if not stamping
+             else "Click to place %s · Esc stops" % arrange.ARR["stamp"])
+    a, b = col.row(32).split_cols(2, 6 * s)
+    kit.toggle("lean", a, "Lean with surface", sm.stick_align, lambda v: setattr(sm, "stick_align", v) or redraw(), Theme.blue)
+    if can_stamp:
+        kit.toggle("setpiece", b, "Set piece: on" if ob.stop_motion_set else "Set piece: off", ob.stop_motion_set,
+                   lambda v: run(bpy.ops.stop_motion.set_piece, on=v) or redraw())
+    else:
+        kit.button("setpiece", b, "Set piece", lambda: None, enabled=False, size=12)
+    col.y -= 8 * s
     col.title("Props")
     kit.button("mkprop", col.row(36), "Make selected a prop", lambda: run(bpy.ops.stop_motion.make_prop) or redraw())
     for p_ob in solid.props(scene):

@@ -169,6 +169,25 @@ class SM_PT_props(bpy.types.Panel):
         if ob is not None and ob.type == 'MESH':
             row = layout.row(align=True)
             row.prop(ob, "stop_motion_solid", text="%s is solid" % ob.name)
+        from . import arrange
+        box = layout.box()
+        box.label(text="Arrange the set")
+        if arrange.ARR["active"]:
+            box.operator("stop_motion.stop_arrange", text="Stop arranging (Esc)", icon='CANCEL', depress=True)
+        else:
+            row = box.row(align=True)
+            row.operator("stop_motion.arrange", text="Arrange", icon='SNAP_FACE')
+            src = context.active_object
+            op = row.operator("stop_motion.arrange", text="Stamp copies", icon='STICKY_UVS_DISABLE')
+            op.stamp_source = src.name if src else ""
+            row.enabled = True
+        box.prop(scene.stop_motion, "stick_align")
+        box.prop(scene.stop_motion, "stamp_vary")
+        row = box.row(align=True)
+        row.operator("stop_motion.set_piece", text="Make set piece").on = True
+        row.operator("stop_motion.set_piece", text="Back in shots").on = False
+        if ob is not None:
+            box.prop(ob, "stop_motion_set", text="%s is a set piece" % ob.name)
         layout.operator("stop_motion.make_prop", text="Make Selected a Prop", icon='OBJECT_DATA')
         for p in solid.props(scene):
             box = layout.box()

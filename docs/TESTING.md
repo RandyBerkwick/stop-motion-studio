@@ -20,6 +20,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Sculpt a shot: a shape key per shot, on only for that shot (or carry on from it); it follows its shot through deletes and survives a pose over; Save as Swap Part renames it into a swap set (Face › Surprised).
 - Nomad bridge: Send writes an OBJ (Y-up, exact round trip); the folder watcher spots the re-exported file and puts the sculpt on that shot; same vertex count is matched point for point, a reordered or triangulated mesh is fitted to the surface.
 - Studio: layout (live box centred, panels tile the window), widget clicks, drags, sliders, wheel, hold handles; shot pictures rendered off-screen and saved; free-view picture renders; drag-to-hold changes holds a frame per card width, never below 1; a failed start rolls back so Blender is never left half-hidden. Screens rendered off-screen and checked by eye.
+- Arrange: rays skip the dragged object and anything not solid; a cup slid onto the floor sits on it upright; a flower stuck to the side of a lumpy bush leans out along the surface (or stays upright) and nothing is left inside the bush; 21 stamped flowers are linked copies with varied size and spin, none buried; set pieces aren't keyed, moving one sticks in every shot, Make Set Piece clears old keys without moving it. Rendered and checked by eye.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -79,6 +80,14 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 44. Ctrl+Alt+Shift+B: normal Blender, same scene. Again: back to the Studio.
 45. Tell me anything that lets Blender's own UI show through (menus, pop-ups, tooltips), and anything that feels slow.
 
+## Arranging the set (0.7.0)
+46. Studio › Animate › Set tab (or Blender: Stop Motion › Props & Solid World › Arrange the set). Click Arrange: the rings hide.
+47. Press on the table, the mug or the wall and drag: it slides along whatever surface is under the mouse and sits on it, never inside. Wheel spins it. Alt flips leaning. Ctrl: free move. Esc while dragging: back where it was. Esc again (or Stop): arranging ends.
+48. Lean with surface on: drag the mug up the wall or round a curved object: it tips to follow. Off: it stays upright.
+49. Make a bush (any lumpy mesh) and a small flower. Select the flower, Stamp copies, click all over the bush: each click places a flower standing out of the surface, each a bit different. Esc stops.
+50. Shoot a few shots, then drag a stamped flower: it moves in every shot (set piece). Make the table a set piece, move it: same. Click Set piece: off on something to put it back in the shots.
+51. Tell me how dragging feels on heavy meshes (the bush), and whether the lean is right on your real set pieces.
+
 ## Known gaps
 - In normal Blender the shot cards are still a grid in the sidebar (the Studio has the strip).
 - Studio: no file browser for bringing in a puppet yet (use the hidden way back); swap pop-up (D) not in the Studio; sculpt brushes are Blender's default brush.
@@ -87,6 +96,8 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Switching the filming camera isn't part of the shots yet (it's for checking angles).
 - The ghost comes from whichever camera took each shot, so it lines up only on that camera.
 - Twisting (Alt+drag, and joined parts like the head) isn't stopped by solids yet; only moves are.
+- Arranging pushes things out of what they land on; things it passes on the way aren't checked (it follows the mouse, not a path).
+- Stamp places one copy per click (no brush/drag-painting yet).
 - A puppet's own parts can pass through each other (hand into own body).
 - Sculpting is on the mesh at rest (the shape is added on top of the pose), so very big posed changes are easier in Blender than in Nomad.
 - Nomad remesh, Dynamic Topology or Multires change the mesh: the sculpt is then fitted to the surface (close, not exact).

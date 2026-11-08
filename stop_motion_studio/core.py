@@ -87,7 +87,8 @@ def tracked_objects(scene, context=None, scope='ALL'):
         pool = list(context.selected_objects)
     else:
         pool = list(scene.objects)
-    return [ob for ob in pool if not _is_deformed_by_rig(ob)]
+    # Set pieces stay where they are put in every shot: never keyed.
+    return [ob for ob in pool if not _is_deformed_by_rig(ob) and not getattr(ob, "stop_motion_set", False)]
 
 
 def _rotation_path(t):

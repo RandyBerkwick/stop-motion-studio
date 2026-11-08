@@ -28,6 +28,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 7. Sculpt one shot: Blender clay tools or Nomad Sculpt round trip (OBJ in a synced folder such as iCloud Drive, auto bring-back); keep as one-off, save as swap part, or carry on.
 - Multiple camera setups, each lockable.
 - Solid world: parts can't pass through floor, walls or other puppets; props drop onto surfaces; feet pin; hands can hold props.
+- Arranging the set: objects slide along whatever surface is under the mouse and stick to it without intersecting, leaning with the surface or staying upright; stamp copies onto surfaces (flowers on a bush); set pieces stay put in every shot.
 
 ## Build order and status
 1. Core: workspace layout, Shoot with holds, shot list, ghost, hide UI, preview/export. **0.1.0 hand-tested OK on Mac.**
@@ -35,7 +36,8 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 3. Cameras & light: camera setups + locks, saved views, presets, light per shot. **0.3.0 hand-tested OK on Mac; merged.**
 4. Solid world: collision-aware drag tool, drop to surface. **0.4.0 hand-tested OK on Mac; merged.**
 5. Sculpt: per-shot sculpt, Nomad bridge. **0.5.0 built; logic and file round trip tested headless.**
-6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 built on branch studio-ui; interface rendered and checked off-screen; needs a real-window test.**
+6. Studio (Blender hidden): full-screen interface, left picture + centre live view + right tabs + shot strip, drag a card edge to change its hold. **0.6.0 launcher working on Mac.**
+7. Arranging the set: slide and stick on surfaces, stamp copies, set pieces. **0.7.0 built on branch arrange; tested headless and rendered.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.

@@ -66,6 +66,10 @@ class SM_Settings(bpy.types.PropertyGroup):
     capture_dir: StringProperty(name="Shot pictures", subtype='DIR_PATH',
                                 default="//stopmotion_shots/")
     show_hud: BoolProperty(name="Shot number on camera", default=True)
+    stick_align: BoolProperty(name="Lean with the surface", default=True,
+                              description="Objects you arrange tilt to follow the surface (off: they stay upright)")
+    stamp_vary: FloatProperty(name="Vary size", min=0.0, max=0.6, default=0.15, subtype='FACTOR',
+                              description="How much each stamped copy's size varies")
     solid_world: BoolProperty(name="Solid world", default=True,
                               description="Dragged parts and props stop at surfaces instead of passing through")
 

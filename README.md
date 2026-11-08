@@ -46,6 +46,7 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | `stop_motion_studio/layout.py` | Stop Motion workspace (camera + free view), hide UI, camera only |
 | `stop_motion_studio/ui.py` | Sidebar panels, shot grid, camera HUD, hotkeys, frame-change handler |
 | `stop_motion_studio/props.py` | Scene settings and the shot list |
+| `stop_motion_studio/arrange.py` | Arranging: slide and stick on surfaces, stamp copies, set pieces |
 | `stop_motion_studio/studio.py` | The Studio: full-screen mode, input filter, screens, off-screen views and captures |
 | `stop_motion_studio/studio_kit.py` | Studio widgets and layout (no GPU: testable) |
 | `stop_motion_studio/studio_paint.py` | Draws the Studio with Blender's gpu/blf |
@@ -69,6 +70,8 @@ Set `BLENDER=/path/to/Blender` if it isn't in /Applications. The tests cover the
 | Ctrl+Alt+Shift+B | Normal Blender (and back) |
 
 Drag the right edge of a card in the shot strip to hold that shot longer or shorter.
+
+**Arranging the set** (Set tab): Arrange, then drag anything along surfaces; it sticks without sinking in. Wheel spins, Alt leans or stands upright, Ctrl moves freely, Esc puts it back. Stamp copies: select an object, then click on surfaces to place varied copies (flowers on a bush). Set pieces stay put in every shot.
 
 ## Keys in normal Blender (3D view)
 | Key | Does |
