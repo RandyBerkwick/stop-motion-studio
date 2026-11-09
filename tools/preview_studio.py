@@ -76,6 +76,9 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
     studio.S.mode = mode
     studio.S.side = side
     pstep = os.environ.get("SM_PREVIEW_PSTUDIO")
+    if os.environ.get("SM_PREVIEW_KIT"):            # a library folder with your own kit parts in it
+        from stop_motion_studio import library
+        library.LIBRARY_DIR = os.environ["SM_PREVIEW_KIT"]
     if pstep:
         from stop_motion_studio import assembly, faces, studio_puppets as sp, trial, rigsculpt
         if pstep == 'JOINTS':
@@ -109,8 +112,11 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
                 res = trial.last_results(pip)
                 res[0]["problems"].append({"kind": "FOLDS", "part": "Pip Arms R", "text": "Arms (right) folds in", "fix": "SOFTEN", "fix_label": "Soften joints"})
                 pip["sm_try"] = __import__("json").dumps(res)
+            for spec in filter(None, os.environ.get("SM_PREVIEW_PARTS", "").split(";")):   # kind=variant;...
+                k_, v_ = spec.split("=", 1)
+                assembly.add_part(ctx, pip, k_, v_)
             vl.objects.active = pip
-            sp.P.start, sp.P.step, sp.P.kind = 'PARTS', pstep, "body"
+            sp.P.start, sp.P.step, sp.P.kind = 'PARTS', pstep, os.environ.get("SM_PREVIEW_KIND", "body")
             sp.P.set_name = "Mouth"
             focus = [o for o in pip.children if o.type == 'MESH' and not o.hide_render]
         pts = [o.matrix_world @ __import__("mathutils").Vector(c) for o in focus for c in o.bound_box]
@@ -120,6 +126,13 @@ with bpy.context.temp_override(scene=scene, view_layer=vl, area=area, region=reg
         studio.S.free.distance = (hi - lo).length * 1.25
         studio.S.free_init = True
         studio.S.live = 'FREE'
+    if env("SM_PREVIEW_WEAR"):                      # "Mug:head:Hat" wears the mug on the head, in a Hat swap set
+        from stop_motion_studio import wear as _wear
+        wname, wbone, wset = (env("SM_PREVIEW_WEAR").split(":") + ["", ""])[:3]
+        wob = bpy.data.objects[wname]
+        _wear.wear(ctx, wob, arm, wbone)
+        if wset:
+            _wear.set_swap(ctx, wob, wset)
     if env("SM_PREVIEW_LIB"):
         from stop_motion_studio import library
         library.LIBRARY_DIR = env("SM_PREVIEW_LIB")

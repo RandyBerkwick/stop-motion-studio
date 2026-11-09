@@ -289,7 +289,9 @@ def change_build(context, arm, template=None, props=None):
         for p in info.get("parts", []):
             if p["kind"] in kit:
                 ok = {v for v, _l in kit[p["kind"]][1]}
-                keep.append(dict(p, variant=p["variant"] if p["variant"] in ok else kit[p["kind"]][1][0][0]))
+                from . import userkit
+                fits = p["variant"] in ok or userkit.is_user(p["variant"])
+                keep.append(dict(p, variant=p["variant"] if fits else kit[p["kind"]][1][0][0]))
         info["parts"] = keep
         from . import faces as _faces
         info["faces"] = [f for f in info.get("faces", []) if f in _faces.FACE_SETS[template]]
@@ -523,13 +525,21 @@ KIT = {
         "tail": ("Tail", [("thick", "Thick tail"), ("thin", "Thin tail")]),
     },
 }
+# hair, hats and extras: optional, and fitted to whatever head and body are on
+for _t in ('PERSON', 'FOUR_LEGS'):
+    KIT[_t]["hair"] = ("Hair", [("none", "No hair"), ("mop", "Mop"), ("bun", "Bun"), ("spiky", "Spiky")])
+    KIT[_t]["hat"] = ("Hats", [("none", "No hat"), ("cap", "Cap"), ("bobble", "Bobble hat"), ("top", "Top hat")])
+    KIT[_t]["extra"] = ("Extras", [("none", "Nothing"), ("tag", "Name tag"), ("scarf", "Scarf"), ("glasses", "Glasses")])
 KIT['CHILD'] = KIT['PERSON']
 KIT['TALL'] = KIT['PERSON']
 KIT_KINDS = {k: set(v) for k, v in KIT.items()}
+OPTIONAL = ("hair", "hat", "extra")
+BUILD_ORDER = ["body", "head", "arms", "legs", "feet", "tail", "hair", "hat", "extra"]   # hats need the head first
 
 DEFAULT_COLOUR = {"head": "skin", "body": "blue", "arms": "blue", "legs": "denim", "feet": "dark",
-                  "tail": "fur"}
-DEFAULT_COLOUR_FOUR = {"head": "fur", "body": "fur", "legs": "fur", "feet": "dark", "tail": "fur"}
+                  "tail": "fur", "hair": "brown", "hat": "red", "extra": "white"}
+DEFAULT_COLOUR_FOUR = {"head": "fur", "body": "fur", "legs": "fur", "feet": "dark", "tail": "fur",
+                       "hair": "brown", "hat": "red", "extra": "white"}
 
 
 def default_colour(arm, kind):
@@ -557,7 +567,14 @@ def _part_name(arm, kind, side=""):
 
 
 def make_part(context, arm, kind, variant, colour=None, side=""):
-    """Make one kit part to fit `arm`, attach it, and return the object."""
+    """Make one kit part to fit `arm`, attach it, and return the object (None for 'none')."""
+    from . import userkit
+    if userkit.is_user(variant):
+        made = userkit.make(context, arm, kind, variant, colour, side)
+        return made[0] if made else None
+    if kind in OPTIONAL:
+        from . import accessories
+        return accessories.make(context, arm, kind, variant, colour)
     J, info = _j(arm)
     template = info["template"]
     four = template == 'FOUR_LEGS'
@@ -684,6 +701,11 @@ def add_part(context, arm, kind, variant, colour=None):
     """Put a kit part on the puppet (both sides for arms, legs and feet). A part
     of the same kind already there is swapped out."""
     info = build_info(arm)
+    from . import userkit
+    if userkit.is_user(variant):              # read it first: a missing file mustn't cost you the old part
+        found = userkit.parse(variant)
+        if found is None or userkit.source_mesh(*found) is None:
+            raise FileNotFoundError("Couldn't read %s" % userkit.label_of(variant))
     remove_kind(arm, kind)
     entry = {"kind": kind, "variant": variant, "colour": colour or default_colour(arm, kind)}
     info["parts"] = [p for p in info.get("parts", []) if p["kind"] != kind] + [entry]
@@ -693,17 +715,28 @@ def add_part(context, arm, kind, variant, colour=None):
         _unpuppet(context, arm)
         _rest(arm)
     out = _make_entry(context, arm, entry)
+    if kind in ("head", "body"):          # hair, hats and extras are fitted to these: fit them again
+        for p in _ordered(info.get("parts", [])):
+            if p["kind"] in OPTIONAL:
+                remove_kind(arm, p["kind"])
+                _make_entry(context, arm, p)
     if was_puppet:
         finish_build(context, arm)
     return out
 
 
+def _ordered(parts):
+    return sorted(parts, key=lambda p: BUILD_ORDER.index(p["kind"]) if p["kind"] in BUILD_ORDER else 99)
+
+
 def _make_entry(context, arm, entry):
     context.view_layer.update()
     if entry["kind"] in SIDES:
-        return [make_part(context, arm, entry["kind"], entry["variant"], entry["colour"], side)
-                for side in ("L", "R")]
-    return [make_part(context, arm, entry["kind"], entry["variant"], entry["colour"])]
+        out = [make_part(context, arm, entry["kind"], entry["variant"], entry["colour"], side)
+               for side in ("L", "R")]
+    else:
+        out = [make_part(context, arm, entry["kind"], entry["variant"], entry["colour"])]
+    return [o for o in out if o is not None]
 
 
 def remove_kind(arm, kind):
@@ -726,6 +759,12 @@ def set_colour(context, arm, kind, colour):
     set_build_info(arm, info)
     for ob in kit_parts(arm):
         if json.loads(ob["sm_part"])["kind"] == kind:
+            mats = [m for m in ob.data.materials if m is not None]
+            if any(not m.name.startswith("SM Clay") for m in mats):
+                continue                     # your own textured part keeps its look
+            if len(mats) > 1:                # two-colour kit parts: the main colour changes
+                ob.data.materials[0] = clay(colour)
+                continue
             ob.data.materials.clear()
             ob.data.materials.append(clay(colour))
 
@@ -735,7 +774,7 @@ def remake_parts(context, arm):
     info = build_info(arm)
     for p in info.get("parts", []):
         remove_kind(arm, p["kind"])
-    for p in info.get("parts", []):
+    for p in _ordered(info.get("parts", [])):
         _make_entry(context, arm, p)
     from . import faces
     faces.remake(context, arm)
@@ -746,7 +785,8 @@ def starter(context, arm):
     info = build_info(arm)
     kit = KIT[info["template"]]
     for kind, (_label, variants) in kit.items():
-        add_part(context, arm, kind, variants[0][0])
+        if kind not in OPTIONAL:
+            add_part(context, arm, kind, variants[0][0])
     return arm
 
 
@@ -797,7 +837,11 @@ class SM_OT_build_part(bpy.types.Operator):
         arm = _arm(context, self.puppet)
         if arm is None:
             return {'CANCELLED'}
-        add_part(context, arm, self.kind, self.variant, self.colour or None)
+        try:
+            add_part(context, arm, self.kind, self.variant, self.colour or None)
+        except (OSError, ValueError, RuntimeError) as exc:
+            self.report({'WARNING'}, "Couldn't put that part on: %s" % exc)
+            return {'CANCELLED'}
         return {'FINISHED'}
 
 

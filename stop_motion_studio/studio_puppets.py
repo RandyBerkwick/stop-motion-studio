@@ -13,7 +13,7 @@ import bpy
 from bpy_extras import view3d_utils
 from mathutils import Vector
 
-from . import assembly, faces, library, puppet, rigsculpt, trial
+from . import assembly, faces, library, puppet, rigsculpt, trial, userkit
 from .studio_kit import Rect, Theme
 
 STEPS = (('BUILD', "Build"), ('JOINTS', "Joints"), ('FACE', "Face & hands"), ('TRY', "Try it"), ('SAVE', "Save"))
@@ -200,29 +200,89 @@ def _left_build(kit, r, ctx, s, Column):
     if P.kind not in kinds:
         P.kind = kinds[0]
     col.title("Parts kit · " + arm.name)
-    cells = col.row(30, 6).split_cols(len(kinds), 3 * s)
-    for cell, k in zip(cells, kinds):
-        kit.button("pkind:" + k, cell, kit_[k][0], (lambda kk=k: setattr(P, "kind", kk) or redraw()), "tab", P.kind == k, size=11)
+    per = 5 if len(kinds) > 5 else len(kinds)
+    for start in range(0, len(kinds), per):
+        row_kinds = kinds[start:start + per]
+        cells = col.row(28, 4).split_cols(per, 3 * s)
+        for cell, k in zip(cells, row_kinds):
+            kit.button("pkind:" + k, cell, kit_[k][0], (lambda kk=k: setattr(P, "kind", kk) or redraw()), "tab", P.kind == k, size=11)
+    col.y -= 4 * s
     info = assembly.build_info(arm)
     on = {p["kind"]: p for p in info.get("parts", [])}
     current = on.get(P.kind)
     for vid, label in kit_[P.kind][1]:
-        sel = current is not None and current["variant"] == vid
-        kit.button("pvar:" + vid, col.row(40, 6), label + ("  ·  on " + arm.name if sel else ""),
-                   (lambda v=vid: use_part(P.kind, v)), "clay", sel, size=13)
-    col.heading("COLOUR")
-    colours = list(assembly.COLOURS)
-    per = 7
-    for start in range(0, len(colours), per):
-        cells = col.row(28, 5).split_cols(per, 5 * s)
-        for cell, c in zip(cells, colours[start:start + per]):
-            rgb = assembly.COLOURS[c]
-            sel = current is not None and current["colour"] == c
-            kit.p.rect(cell, (*rgb, 1.0), 6 * s)
-            if sel:
-                kit.p.rect_outline(cell, t.blue, 6 * s, 2.5 * s)
-            kit.area("pcol:" + c, cell, on_click=(lambda cc=c: colour_part(P.kind, cc)))
+        if not col.room(40):
+            break
+        sel = (current is not None and current["variant"] == vid) or (current is None and vid == "none")
+        kit.button("pvar:" + vid, col.row(34, 5), label + ("  ·  on " + arm.name if sel and vid != "none" else ""),
+                   (lambda v=vid: use_part(P.kind, v)), "clay", sel, size=12)
+    _yours(kit, col, arm, current, s)
+    if col.room(70):
+        col.heading("COLOUR")
+        colours = list(assembly.COLOURS)
+        per = 7
+        for start in range(0, len(colours), per):
+            cells = col.row(24, 4).split_cols(per, 5 * s)
+            for cell, c in zip(cells, colours[start:start + per]):
+                rgb = assembly.COLOURS[c]
+                sel = current is not None and current["colour"] == c
+                kit.p.rect(cell, (*rgb, 1.0), 6 * s)
+                if sel:
+                    kit.p.rect_outline(cell, t.blue, 6 * s, 2.5 * s)
+                kit.area("pcol:" + c, cell, on_click=(lambda cc=c: colour_part(P.kind, cc)))
     col.note("Parts snap onto the wire: the wire is the rig.")
+
+
+def _yours(kit, col, arm, current, s):
+    """Parts you've made, from Library › Kit, as small picture cards."""
+    t = Theme
+    if not col.room(70):
+        return
+    mine = userkit.parts(P.kind)
+    folder = userkit.FOLDERS.get(P.kind, "")
+    col.heading("YOURS · KIT › %s" % folder.upper())
+    if not mine:
+        col.note("Put .blend files in Library › Kit › %s" % folder)
+    else:
+        missing = [(path, item) for _v, _l, path, item in mine
+                   if not os.path.exists(library.thumb_path(path, item))]
+        if missing:
+            library.queue_thumbnails(missing)
+        per = 3
+        for start in range(0, len(mine), per):
+            if not col.room(96):
+                break
+            cells = col.row(84, 6).split_cols(per, 6 * s)
+            for cell, (vid, label, path, item) in zip(cells, mine[start:start + per]):
+                sel = current is not None and current["variant"] == vid
+                kit.panel(cell, t.yellow if (sel and t.sketchy) else t.raised, 8, t.blue if sel else None)
+                pic = Rect(cell.x + 4 * s, cell.y + 20 * s, cell.w - 8 * s, cell.h - 24 * s)
+                img = library.thumb_image(library.thumb_path(path, item))
+                if img is not None:
+                    w, h = img.size
+                    kit.p.image(pic.fit_aspect(w / max(1, h)), img)
+                else:
+                    kit.label(pic, "…", 12, t.muted, "center")
+                kit.label(Rect(cell.x + 4 * s, cell.y + 2 * s, cell.w - 8 * s, 18 * s), label, 11, t.text, "center", sel)
+                kit.area("pmine:" + vid, cell, on_click=(lambda v=vid: use_part(P.kind, v)))
+    a, b = col.row(28, 6).split_cols(2, 6 * s)
+    kit.button("pkit:open", a, "My kit folder", open_kit_folder, size=11)
+    kit.button("pkit:look", b, "Look again", look_again, size=11)
+
+
+def open_kit_folder():
+    folder = os.path.join(userkit.ensure_folders(), userkit.FOLDERS.get(P.kind, ""))
+    try:
+        bpy.ops.wm.path_open(filepath=folder)
+    except Exception:
+        toast(folder, 5.0)
+
+
+def look_again():
+    userkit._LIST_CACHE.clear()
+    library.queue_thumbnails(userkit.missing_pictures())
+    toast("Looked in your kit folder again")
+    redraw()
 
 
 def _left_joints(kit, r, ctx, s, Column):

@@ -44,6 +44,7 @@ A Blender extension (add-on) that turns full Blender into an animator-friendly, 
 11. Library pictures; puppet studio: build from a parts kit on a wire armature (person, small child, tall, four legs) with proportions, or place joints on a sculpt; face & hands swap sets (mouths picked by hand); try it with test poses and fixes; save to the library. **1.1.0 built on branch finish; tested headless and rendered.**
 12. Friendly looks: five styles mocked up (Playroom, Sketchbook, Plasticine, Night studio, First steps); Sketchbook picked and drawn out on four screens, then built into the Studio as a look you switch from the top bar (squared paper, wobbly ink outlines with offset shadows, highlighter for what's picked, Patrick Hand and Kalam fonts shipped under the OFL). **1.2.0 built on branch finish; tested headless and rendered.**
 13. Help: a "How to…" column for every view (13 guides, 2–8 steps each) with small looping pictures drawn live in the Studio's own look: animating, building a scene, bringing things in, lighting, sculpting, watching and sharing, building/rigging/face/try/save in the puppet studio, projects. **1.3.0 built on branch finish; tested headless and rendered.**
+14. Your own kit parts and Wear it: models in Library › Kit › <kind> (named by file or collection, textures kept) appear in the parts kit and are fitted to the armature; built-in hair, hats and extras (name tag, scarf, glasses); Wear it puts any prop on a puppet where you click, riding that part, optionally as a swap set with None. **1.4.0 built on branch finish; tested headless and rendered.**
 
 ## Keys (normal Blender; the Studio's keys are in the README)
 Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 hide UI · Shift+F5 camera only · F6 ghost · D swap parts.
@@ -58,7 +59,8 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Quitting from the Studio saves instead of asking (unsaved projects go to ~/Stop Motion).
 - The Studio's look (Dark studio or Sketchbook) is a preference, not part of the project, so it follows the person, not the file. Dark stays the default.
 - Help opens beside the Studio (its own column on the left), never over it, so you can follow a guide while doing it. It follows the view unless you browse to another guide.
-- The library is a folder of .blend files (~/Stop Motion/Library).
+- The library is a folder of .blend files (~/Stop Motion/Library). Your own kit parts live in its Kit folder, one folder per kind, named by file or collection; they're fitted by their outline, and copied into the project when used.
+- Worn things ride their part and aren't animated on their own (like set pieces); swapping one in and out is per shot.
 - Light changes hold until changed again: lights are keyed with every shot.
 - Posing over a sculpted shot keeps its sculpt.
 - Nomad bridge is a file round trip (OBJ in iCloud Drive › Stop Motion Nomad); in Nomad, import with "Keep topology" for an exact match.
@@ -66,4 +68,5 @@ Enter shoot / replace · ← → step shots · Alt+Backspace delete shot · F5 h
 - Puppet studio: a parts-kit puppet skips the Joints step (the armature is the rig). Mouths are picked by hand, shot by shot (no automatic lip sync). Four-legged puppets are in from the start. Fingers are posed by swapping hand shapes or by sculpting a hand on a shot (and keeping it as a new shape); no finger bones.
 
 ## Open questions
-- Which kit parts to add next (hair, hats, clothes, animal kinds)?
+- Which kit parts to add next: clothes (coats, dresses), more animal kinds (bird, fish)?
+- Worn things: a ring to nudge them on the puppet?

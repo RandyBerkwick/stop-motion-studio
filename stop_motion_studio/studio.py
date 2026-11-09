@@ -25,6 +25,7 @@ from mathutils import Matrix, Quaternion, Vector
 
 from . import cameras, core, library, lighting, ops, props, puppet, sculpt, solid
 from . import studio_help
+from . import wear as wearing
 from . import studio_puppets as sp
 from .studio_kit import Kit, Rect, Theme, apply_look, studio_layout
 
@@ -93,6 +94,7 @@ class State:
         self.pending = []             # [(scene name, uid, path)] captures to render
         self.toast = ("", 0.0)
         self.overlay = None           # None | 'PROJECTS' | 'LIBRARY' | 'SWAPS'
+        self.wear = None              # the thing waiting to be put on a puppet (click where it goes)
         self.lib_file = None          # the library file picked in the browser
         self.lib_cache = {}           # path -> (mtime, items)
         self.swap_at = (0, 0)         # where D was pressed
@@ -547,6 +549,49 @@ def toggle_help():
     redraw()
 
 
+def start_wear(name):
+    """Wait for a click on the puppet where `name` goes."""
+    S.wear = None if S.wear == name else name
+    if S.wear:
+        toast("Click on the puppet where %s goes · Esc cancels" % name, 4.0)
+    redraw()
+
+
+def wear_click(context, mx, my):
+    """A click in the live view while something waits to be worn."""
+    from bpy_extras import view3d_utils
+    ob = bpy.data.objects.get(S.wear or "")
+    area, region = studio_area()
+    if ob is None or area is None:
+        S.wear = None
+        return False
+    rv3d = area.spaces.active.region_3d
+    o = view3d_utils.region_2d_to_origin_3d(region, rv3d, (mx, my))
+    d = view3d_utils.region_2d_to_vector_3d(region, rv3d, (mx, my))
+    dg = context.evaluated_depsgraph_get()
+    for _i in range(8):                       # look past the thing itself
+        hit, loc, nrm, _idx, hob, _m = context.scene.ray_cast(dg, o, d)
+        if not hit:
+            break
+        if hob is not None and (hob == ob or hob.get("sm_worn")):
+            o = loc + d * 1e-4
+            continue
+        if wearing.armature_of(hob) is None:
+            break
+        try:
+            bpy.ops.ed.undo_push(message="Wear It")
+        except Exception:
+            pass
+        if wearing.wear_at(context, ob, hob, loc, nrm) is not None:
+            toast("%s is on %s" % (ob.name, wearing.armature_of(hob).name))
+            S.wear = None
+            redraw()
+            return True
+        break
+    toast("Click on a puppet · Esc cancels")
+    return True
+
+
 def toggle_look():
     props.set_look('DARK' if props.get_look() == 'SKETCH' else 'SKETCH')
     apply_look(props.get_look())
@@ -961,14 +1006,34 @@ def draw_props(kit, r, ctx, scene, s):
             break
         held = solid.held_by(p_ob)
         col.heading(p_ob.name.upper() + ("  · held" if held else ""))
-        a, b = col.row(34, 12).split_cols(2, 6 * s)
+        a, b, c = col.row(34, 12).split_cols(3, 5 * s)
         if held:
-            kit.button("letgo:" + p_ob.name, a, "Let go", lambda n=p_ob.name: run(bpy.ops.stop_motion.let_go, name=n) or redraw())
+            kit.button("letgo:" + p_ob.name, a, "Let go", lambda n=p_ob.name: run(bpy.ops.stop_motion.let_go, name=n) or redraw(), size=12)
         else:
-            kit.button("hold:" + p_ob.name, a, "Hold in hand", lambda n=p_ob.name: run(bpy.ops.stop_motion.hold_prop, name=n) or redraw())
-        kit.button("drop:" + p_ob.name, b, "Drop", lambda n=p_ob.name: run(bpy.ops.stop_motion.drop_prop, name=n) or redraw())
+            kit.button("hold:" + p_ob.name, a, "Hold", lambda n=p_ob.name: run(bpy.ops.stop_motion.hold_prop, name=n) or redraw(), size=12)
+        kit.button("wear:" + p_ob.name, b, "Wear it", lambda n=p_ob.name: start_wear(n), selected=S.wear == p_ob.name, size=12)
+        kit.button("drop:" + p_ob.name, c, "Drop", lambda n=p_ob.name: run(bpy.ops.stop_motion.drop_prop, name=n) or redraw(), size=12)
     if not solid.props(scene):
         col.note("Select an object, then Make selected a prop.")
+    on = wearing.worn(scene)
+    if on and col.room(70):
+        col.y -= 6 * s
+        col.title("Worn")
+        for w_ob in on:
+            if not col.room(70):
+                break
+            arm = w_ob.parent
+            label = w_ob.get("sm_label") or w_ob.name
+            if label == "None":
+                continue
+            col.heading(("%s  · on %s's %s" % (label, arm.name if arm else "?", w_ob["sm_worn"])).upper())
+            a, b = col.row(32, 10).split_cols(2, 6 * s)
+            kit.button("takeoff:" + w_ob.name, a, "Take off", lambda n=w_ob.name: run(bpy.ops.stop_motion.take_off, name=n) or redraw(), size=12)
+            cur = wearing.swap_set_of(w_ob)
+            nxt = (("",) + wearing.SWAP_SETS)[((("",) + wearing.SWAP_SETS).index(cur) + 1) % (len(wearing.SWAP_SETS) + 1)]
+            kit.button("wswap:" + w_ob.name, b, ("Swap: " + cur) if cur else "Make a swap", 
+                       lambda n=w_ob.name, v=nxt: run(bpy.ops.stop_motion.wear_swap, name=n, set_name=v) or redraw(),
+                       selected=bool(cur), size=12)
 
 
 def draw_light(kit, r, scene, s):
@@ -1506,6 +1571,9 @@ class SM_OT_studio_loop(bpy.types.Operator):
                 if kit.on_press(mx, my):
                     area.tag_redraw()
                     return {'RUNNING_MODAL'}
+                if in_live and S.overlay is None and S.wear and wear_click(context, mx, my):
+                    area.tag_redraw()
+                    return {'RUNNING_MODAL'}
                 if in_live and S.overlay is None and S.mode == 'PUPPETS' and sp.live_click(context, mx, my):
                     area.tag_redraw()
                     return {'RUNNING_MODAL'}
@@ -1551,6 +1619,11 @@ class SM_OT_studio_loop(bpy.types.Operator):
         cmd = event.ctrl or event.oskey
         if S.overlay is not None and t == 'ESC':
             S.overlay = None
+            return True
+        if t == 'ESC' and S.wear:
+            S.wear = None
+            toast("")
+            redraw()
             return True
         if t == 'ESC' and studio_help.H.open and S.chrome:
             toggle_help()

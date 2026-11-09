@@ -203,8 +203,24 @@ class SM_PT_props(bpy.types.Panel):
                 row.operator("stop_motion.let_go", icon='UNLINKED').name = p.name
             else:
                 row.operator("stop_motion.hold_prop", text="Hold in hand", icon='LINKED').name = p.name
+                row.operator("stop_motion.wear", text="Wear it", icon='MOD_CLOTH').name = p.name
                 row.operator("stop_motion.drop_prop", text="Drop", icon='SORT_ASC').name = p.name
             box.prop(p, "stop_motion_falls")
+        from . import wear as _wear
+        worn = [o for o in _wear.worn(scene) if o.get("sm_label") != "None"]
+        if worn:
+            layout.label(text="Worn (rides on the puppet, in every shot)")
+        for w in worn:
+            box = layout.box()
+            row = box.row(align=True)
+            row.label(text="%s · %s" % (w.get("sm_label") or w.name, w["sm_worn"]), icon='MOD_CLOTH')
+            row.operator("stop_motion.take_off", text="Take off").name = w.name
+            row = box.row(align=True)
+            row.label(text="Swap set")
+            cur = _wear.swap_set_of(w)
+            for sname in ("",) + _wear.SWAP_SETS:
+                op = row.operator("stop_motion.wear_swap", text=sname or "None", depress=cur == sname)
+                op.name, op.set_name = w.name, sname
 
 
 class SM_PT_cameras(bpy.types.Panel):
@@ -359,6 +375,7 @@ class SM_PT_puppet_studio(bpy.types.Panel):
         layout.label(text="%s · %s" % (arm.name, assembly.TEMPLATES[info["template"]][0]), icon='ARMATURE_DATA')
         if not info.get("sculpt"):
             on = {p["kind"]: p for p in info.get("parts", [])}
+            from . import userkit
             for kind, (label, variants) in assembly.kit_for(arm).items():
                 row = layout.row(align=True)
                 row.label(text=label)
@@ -366,6 +383,15 @@ class SM_PT_puppet_studio(bpy.types.Panel):
                     op = row.operator("stop_motion.build_part", text=vlabel.split()[0],
                                       depress=on.get(kind, {}).get("variant") == vid)
                     op.puppet, op.kind, op.variant = arm.name, kind, vid
+                mine = userkit.parts(kind)
+                if mine:
+                    row = layout.row(align=True)
+                    row.label(text="   yours")
+                    for vid, vlabel, _p, _i in mine:
+                        op = row.operator("stop_motion.build_part", text=vlabel, icon='FILE_BLEND',
+                                          depress=on.get(kind, {}).get("variant") == vid)
+                        op.puppet, op.kind, op.variant = arm.name, kind, vid
+            layout.operator("stop_motion.open_kit", icon='FILE_FOLDER')
             box = layout.box()
             box.label(text="Proportions (100 = normal)")
             for key in ("height", "head", "arms", "legs"):

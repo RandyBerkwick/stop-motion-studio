@@ -29,6 +29,7 @@ TOPICS = {
         ("Stamp copies", "Select something small, like a flower, click Stamp copies, then click or drag over the bush. Each copy is a little different.", "stamp"),
         ("Set pieces stay put", "Make the table a set piece: it isn't animated, so moving it moves it in every picture.", "set_piece"),
         ("Props in hands", "Put a prop near a hand and click Hold in hand: it follows the hand as you pose. Drop lets it go, and it lands on what's below.", "hold_prop"),
+        ("Wear it", "Click Wear it on a prop, then click the puppet where it goes: a hat on the head, a badge on the chest. It rides on that part. Make a swap to pick it shot by shot.", "wear"),
         ("Cameras", "+ makes a camera from where the free view is looking. The padlock stops it moving. Pick another camera while you shoot to cut to it.", "cameras"),
     ]),
     'BRING_IN': ("Bringing things in", [
@@ -56,6 +57,8 @@ TOPICS = {
         ("Pick a body", "Person, small child, tall, or four legs. It starts as a wire armature, just like a real puppet.", "four_legs"),
         ("Snap on parts", "Click parts on the left: heads, bodies, arms, legs, feet. Each one snaps onto the wire.", "kit_build"),
         ("Colours and sizes", "Click a colour to paint a part. The sliders make the head bigger, the legs longer, and so on. The parts stay joined.", "proportions"),
+        ("Hair, hats and extras", "Hair, Hats and Extras (a name tag, a scarf, glasses) sit on whatever head and body are on, and stay on when you change them.", "hats"),
+        ("Your own parts", "Model a part in Blender and save it in Library › Kit › Hats (or Heads, Arms…). It shows under Yours with its picture and textures, and is fitted to the puppet when you click it.", "own_parts"),
         ("Next: face & hands", "When you like the shape, move on to faces and hands.", "next_step"),
     ]),
     'JOINTS': ("Rigging a sculpt", [
@@ -1104,6 +1107,90 @@ def scene_projects(d):
         d.p.text(Rect(r.x, r.y + 3 * d.s, r.w, 12 * d.s), nm, 8 * d.s, INK, "center", True)
     d.cursor(d.X(0.5), d.Y(0.5), press=seg(t, 0.45, 0.6) if 0.4 < t < 0.65 else 0)
     d.button(0.8, 0.12, 0.34, 0.12, "New project", size=9)
+
+
+def _hat(d, x, y, r, kind, color):
+    if kind == "bobble":
+        d.ellipse(x, y + r * 0.55, r * 1.08, r * 0.55, color)
+        d.ellipse(x, y + r * 0.3, r * 1.12, r * 0.16, WHITE)
+        d.p.circle(x, y + r * 1.15, r * 0.26, WHITE)
+    elif kind == "top":
+        d.p.rect(Rect(x - r * 0.75, y + r * 0.55, r * 1.5, r * 1.1), INK)
+        d.p.rect(Rect(x - r * 1.2, y + r * 0.5, r * 2.4, r * 0.14), INK)
+    elif kind == "crown":
+        pts = [(x - r * 0.9, y + r * 0.5), (x + r * 0.9, y + r * 0.5), (x + r * 1.0, y + r * 1.3), (x + r * 0.5, y + r * 0.9),
+               (x, y + r * 1.35), (x - r * 0.5, y + r * 0.9), (x - r * 1.0, y + r * 1.3)]
+        d.p.polygon(pts, YELLOW)
+    elif kind == "mop":
+        d.ellipse(x, y + r * 0.45, r * 1.12, r * 0.7, (0.42, 0.26, 0.14, 1))
+    else:   # cap
+        d.ellipse(x, y + r * 0.55, r * 1.05, r * 0.5, color)
+        d.ellipse(x - r * 0.7, y + r * 0.35, r * 0.75, r * 0.12, color)
+
+
+def _head_of(d, u, v, h):
+    k = d.L(h)
+    x, y = d.X(u), d.Y(v)
+    hip_y = y + k * 0.45
+    by = hip_y + k * 0.17
+    hr = k * 0.13
+    return x, by + k * 0.21 + hr * 0.9, hr
+
+
+def scene_hats(d):
+    t = d.t
+    d.stage(wall=(0.95, 0.92, 0.86, 1), floor=(0.95, 0.92, 0.86, 1))
+    looks = (("mop", None), ("bobble", RED), ("top", None), ("cap", BLUE))
+    i = min(3, int(t * 4))
+    d.figure(0.36, 0.08, 0.7, arm_r=0.3)
+    x, y, r = _head_of(d, 0.36, 0.08, 0.7)
+    kind, c = looks[i]
+    _hat(d, x, y, r, kind, c or RED)
+    if i == 3:   # with a name tag too
+        d.p.rect(Rect(x + r * 0.2, y - r * 2.6, r * 0.8, r * 0.45), WHITE)
+    for k, nm in enumerate(("Mop", "Bobble hat", "Top hat", "Cap + tag")):
+        rr = d.card(0.78, 0.8 - k * 0.2, 0.34, 0.15, color=Theme.yellow if k == i else WHITE)
+        d.p.text(rr, nm, 9 * d.s, INK, "center", k == i)
+
+
+def scene_own_parts(d):
+    t = d.t
+    d.stage(wall=(0.95, 0.92, 0.86, 1), floor=(0.95, 0.92, 0.86, 1))
+    # a folder with your hat file, its picture card, then it on the puppet
+    f = d.card(0.2, 0.78, 0.32, 0.24, color=(0.98, 0.85, 0.5, 1))
+    d.p.text(Rect(f.x, f.top - 16 * d.s, f.w, 14 * d.s), "Kit › Hats", 8 * d.s, INK, "center", True)
+    d.p.text(Rect(f.x, f.y + 4 * d.s, f.w, 14 * d.s), "Crown.blend", 8 * d.s, INK, "center")
+    show = seg(t, 0.15, 0.35)
+    if show > 0:
+        card = d.card(0.2, 0.38, 0.26 * show + 0.001, 0.34 * show + 0.001, color=WHITE)
+        if show > 0.8:
+            _hat(d, card.cx, card.cy - card.h * 0.25, card.h * 0.22, "crown", YELLOW)
+            d.p.text(Rect(card.x, card.y + 2 * d.s, card.w, 12 * d.s), "Crown", 8 * d.s, INK, "center", True)
+    d.cursor(d.X(0.22), d.Y(0.36), press=seg(t, 0.45, 0.6) if 0.4 < t < 0.65 else 0)
+    d.figure(0.68, 0.08, 0.7, arm_r=0.3 + (1.6 if t > 0.85 else 0))
+    x, y, r = _head_of(d, 0.68, 0.08, 0.7)
+    drop = seg(t, 0.55, 0.8)
+    if drop > 0:
+        _hat(d, x, y + (1 - drop) * d.L(0.3), r, "crown", YELLOW)
+
+
+def scene_wear(d):
+    t = d.t
+    d.stage()
+    d.figure(0.42, 0.08, 0.72, arm_r=0.3, mouth="o" if t > 0.75 else "smile")
+    x, y, r = _head_of(d, 0.42, 0.08, 0.72)
+    # the hat waits on the table, Wear it is pressed, then a click on the head
+    top = d.table(0.82, 0.08, 0.26, 0.24)
+    go = seg(t, 0.55, 0.75)
+    hx, hy = lerp(d.X(0.82), x, go), lerp(top + r * 0.1, y, go)
+    _hat(d, hx, hy - (r * 0.5 if go < 1 else 0), r, "cap", RED)
+    b = d.button(0.82, 0.85, 0.3, 0.12, "Wear it", pressed=0.1 < t < 0.2, size=9)
+    if t < 0.3:
+        d.cursor(b.cx, b.cy - 3 * d.s, press=seg(t, 0.1, 0.25))
+    elif t < 0.6:
+        f = seg(t, 0.3, 0.45)
+        d.cursor(lerp(b.cx, x + r * 0.2, f), lerp(b.cy, y + r * 0.8, f), press=seg(t, 0.45, 0.6) if t > 0.45 else 0)
+    d.label(0.5, 0.06, "click where it goes", 11, INK, bold=True)
 
 
 SCENES = {name[6:]: fn for name, fn in globals().items() if name.startswith("scene_") and callable(fn)}

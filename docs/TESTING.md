@@ -38,6 +38,8 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Hand shapes: six per hand; a hand sculpted on one shot and kept becomes a new shape in that hand's set, used by that shot only, with the one-off sculpt removed.
 - Puppet studio: a person from the kit has 8 parts (pairs for arms, legs, feet); bending parts are skinned with every point weighted, heads and feet ride their bone; feet on the floor; swapping and colouring parts; a bigger head makes a bigger head part, longer legs a taller puppet still on the floor, colours kept. Face sets (8 mouths, 5 eyes, 3 brows, both hands with 4 shapes) sit on the front of the face, eyes above the mouth, one showing, swapping works, remade when the head changes. Four legs: rings for head, body, hips, tail and four feet, all four pinned with knee targets; a person changed to four legs keeps only parts that fit. Test poses are tried and the puppet goes back to standing; a hard fold with volume keeping off is noticed; Soften joints remakes the parts softer. A sculpt made from a kit puppet: joints guessed within 2 cm; a click puts a joint in the middle of the clay and mirrors it; Make the rig gives 7 rings, 2 pins, every point weighted (separate bits like ears too), nodding moves the head and not the feet. Saved puppets come back from the library with rings, swaps and pins. The Studio's Puppets mode: steps, building, sliders applied after a pause, faces, trying, saving, a sculpt rigged. Screens rendered and checked by eye.
 - Help: every view has a guide (13 in all), every step's picture exists and draws at every moment of its loop in both looks; the guide follows the view (Animate tabs, Review, each puppet-studio step, Bring in…, Projects); browsing keeps a picked guide until the view changes; the help column fits between the top bar and the footer and the rest still tiles the window; Next, Back, dots and close work. Every picture checked by eye on a contact sheet (`tools/preview_help.py`).
+- Your own kit parts: files in Library › Kit › <kind> are listed by name (collections as separate parts) and don't show in Bring in…; a head modelled 3 m tall and far away is fitted to exactly the head's height, centred on the head joints, riding the head bone; a textured crown keeps its packed texture and sits down over the top of the head, and colouring doesn't paint over it; a bigger head remakes both and the crown still sits on top; with the file gone the kept copy still works; an arm modelled lying sideways runs shoulder to wrist on both sides (the right mirrored), bending with every point weighted; feet on the floor. Choosing a part whose file is missing reports it and keeps the old part. Built-in hair, hats and extras (all 9) ride the head or chest; the name tag has the puppet's name on it; hair sits on top, clear of the face; the hat moves with the head when posed; worn things and hats are saved with the puppet.
+- Wear it: a badge clicked onto the chest rides the chest bone, its back pressed on where clicked, and isn't a prop any more; a hat clicked on top of the head sits on it; a puppet's own parts can't be worn; a worn hat made a swap becomes Hat_<name> with a Hat_None, the swap set shows it and None hides it (kept per shot); Take off makes it a prop again with its name back and the empty set gone.
 - Lights are part of each shot: "Keep this lighting in" this shot / from here on / every shot; Flash, Flicker, Fade to night and Lights out write across shots; light keys move with shots when timing changes.
 
 ## Needs a real screen (please check)
@@ -166,6 +168,16 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 99. Follow a guide while it's open: everything it describes is still on screen and clickable (the live view gets narrower while help is open). Esc or × closes it.
 100. Tell me which steps are unclear, and which pictures don't explain their step.
 
+## Your own parts and Wear it (1.4.0)
+101. Puppets › Build › Hair / Hats / Extras: try each. A hat stays on when you change the head or drag Head size. The name tag says the puppet's name.
+102. "My kit folder" opens Library › Kit (it makes the folders the first time). Model a hat in Blender (any size, anywhere), give it a material with a texture, File › External Data › Pack Resources, and save it as Kit › Hats › Crown.blend. Back in the Studio, Look again: Crown appears under Yours with its picture (a moment later). Click it: it's on the head, textured.
+103. A file with collections (Hats.blend with Cap, Beret, Crown): one card each, named after the collection.
+104. Model one arm (lying sideways or hanging down) into Kit › Arms: both arms go on, shoulder to wrist, and bend when you pose.
+105. Tell me how the fitting feels on your real parts: too big, too small, too low? (Hats are fitted to 1.15× the head's width and sit down over the crown.)
+106. Animate › Set tab: on a prop, Wear it, then click the puppet's head: it sits on the head. Pose the head: it follows, in every shot. Esc cancels waiting for the click.
+107. Worn › Make a swap (click again to pick Hat, Hair, Glasses, Badge or Extra): a swap set appears with None; pick None on one shot and the hat on another; play: it comes and goes.
+108. Take off: it's a prop again where it is. Blender sidebar › Props: Wear it, Take off and the swap set buttons do the same.
+
 ## Known gaps
 - In normal Blender the Dock still says "Blender" (the icon changes only while the Studio is open), and Blender's crash report window looks like Blender.
 - "As shot" GIFs use the shot pictures: a lighting effect added after shooting shows only in a final-render GIF (or re-shoot those shots).
@@ -177,5 +189,7 @@ Blender 5.2 › Edit › Preferences › Get Extensions › ▾ (top right) › 
 - Rigs with their own IK feet: the pin switches the rig's IK constraint; rigs that drive IK/FK with their own sliders (Rigify) keep using their sliders.
 - Knee targets come with new pins: run Make Puppet again on a puppet set up before 1.0.0 to get them.
 - Sketchbook look: a few small marks drawn in fixed colours (hover glows, some badge text) were tuned for the dark look and are faint on paper.
+- Your own parts are fitted by their outline (a box round them), not by where you meant the joints to be; a part with a big brim or long hair is sized by its widest point. Wear it then lets you place a thing exactly.
+- Worn things can't be nudged with a ring yet: Wear it again (Take off, Wear it) to move one.
 - Help open: the side columns get a little narrower, so a few long header labels (Start from › "A sculpt") shorten with "…".
 - The top bar stays visible when hiding the UI, except in Shift+F5 camera-only mode.
